@@ -1,0 +1,48 @@
+module shifter (
+    input a[32],
+    input b[5],
+    input alufn[6],
+    output shift[32]
+) {
+    // SHL path: direct left shift with 0 padding
+    left_shifter shl_unit
+
+    // SHR/SRA path: reverse input -> left shift -> reverse output
+    // Right shift = reverse bits, left shift, reverse bits back
+    bit_reverse rev_in
+    left_shifter shr_unit
+    bit_reverse rev_out
+
+    always {
+        // --- SHL path ---
+        shl_unit.a   = a
+        shl_unit.b   = b
+        shl_unit.pad = 0          // vacated bits always 0 for SHL
+
+        // --- SHR / SRA path ---
+        // Step 1: reverse the input bits so a right shift becomes a left shift
+        rev_in.in    = a
+
+        // Step 2: left-shift the reversed bits
+        shr_unit.a   = rev_in.reversed
+        shr_unit.b   = b
+        // alufn[1]=1 only for SRA (ALUFN 0x23 = 100011), so pad with sign bit only then
+        // alufn[1]=0 for SHR (ALUFN 0x21 = 100001), so pad with 0
+        shr_unit.pad = alufn[1] & a[31]
+
+        // Step 3: reverse the shifted result to get the right-shifted output
+        rev_out.in   = shr_unit.shl
+
+        // --- Output MUX: ALUFN[1:0] selects operation ---
+        // SHL = 2b00  (ALUFN[5:0] = 100000)
+        // SHR = 2b01  (ALUFN[5:0] = 100001)
+        // SRA = 2b11  (ALUFN[5:0] = 100011)
+        shift = 0
+        case (alufn[1:0]) {
+            2b00: shift = shl_unit.shl       // SHL: left shift, zeros fill right
+            2b01: shift = rev_out.reversed    // SHR: logical right shift, zeros fill left
+            2b11: shift = rev_out.reversed    // SRA: arithmetic right shift, sign bit fills left
+            default: shift = 0
+        }
+    }
+}
