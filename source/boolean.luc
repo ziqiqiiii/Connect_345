@@ -1,0 +1,24 @@
+module boolean #(
+    SIZE = 32 : SIZE > 0
+)(
+    input a[SIZE],
+    input b[SIZE],
+    input alufn[6],
+    output bool[SIZE]
+) {
+
+    mux4 mux4[SIZE]  // 32 copies of 4-to-1 MUX
+
+    always {
+        // each mux gets the same 4 ALUFN bits as data inputs
+        mux4.in = SIZEx{{alufn[3:0]}}
+
+        // a[i] and b[i] are the select lines for each mux
+        // select = {a[i], b[i]}
+        repeat(i, SIZE) {
+            mux4.s0[i] = a[i]
+            mux4.s1[i] = b[i]
+        }
+        bool = mux4.out
+    }
+}
