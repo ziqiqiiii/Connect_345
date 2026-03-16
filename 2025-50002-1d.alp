@@ -154,6 +154,11 @@
                     "path": "source/multiplier.luc"
                 }
             },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/test_multiplier.luc"
+                }
             }
         ],
         "constraintFiles": [
