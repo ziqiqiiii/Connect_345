@@ -1,0 +1,23 @@
+// A ripple-carry-adder combinational logic unit
+module rca #(SIZE = 32 : SIZE > 1)
+(
+    input a[SIZE],  // 1st SIZE-bit operand
+    input b[SIZE],  // 2nd SIZE-bit operand
+    input cin,      //1-bit carry-in
+    output cout,    //1-bit carry out
+    output s[SIZE]  //SIZE-bit sum
+) {
+    fa my_fa[SIZE]  // instandtiate SIZE number of 1-bit full adders
+
+    always {
+         my_fa.a = a
+         my_fa.b = b
+         my_fa.cin[0] = cin
+
+         s = my_fa.s
+         cout = my_fa.cout[SIZE-1]
+         repeat(i, SIZE-1, 0, 1){
+           my_fa.cin[i+1] = my_fa.cout[i]
+         }
+    }
+}
