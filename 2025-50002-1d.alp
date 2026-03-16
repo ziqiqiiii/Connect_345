@@ -70,6 +70,12 @@
                     "type": "DiskFile",
                     "path": "source/rca.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/adder.luc"
+                }
             }
         ],
         "constraintFiles": [
