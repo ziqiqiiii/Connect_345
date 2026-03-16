@@ -148,6 +148,12 @@
                     "type": "DiskFile",
                     "path": "source/test_shifter.luc"
                 }
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/multiplier.luc"
+                }
+            },
             }
         ],
         "constraintFiles": [
