@@ -130,6 +130,12 @@
                     "type": "DiskFile",
                     "path": "source/left_shifter.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/bit_reverse.luc"
+                }
             }
         ],
         "constraintFiles": [
