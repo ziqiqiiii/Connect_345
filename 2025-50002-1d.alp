@@ -82,6 +82,12 @@
                     "type": "DiskFile",
                     "path": "source/test_adder.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/compare.luc"
+                }
             }
         ],
         "constraintFiles": [

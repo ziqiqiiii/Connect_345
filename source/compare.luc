@@ -1,0 +1,23 @@
+module compare (
+    input z,
+    input v,
+    input n,
+    input alufn[6],
+    output cmp
+) {
+    always {
+        // implement comparison logic here
+        case (alufn[2:1]){
+            // equals
+            b01: cmp = z            // a - b = 0?
+
+            // signed less than
+            b10: cmp = n ^ v        // 3,5 , -120,10
+
+            //signed leq
+            b11: cmp = z | (n ^ v)
+
+            default: cmp = 0
+        }
+    }
+}
