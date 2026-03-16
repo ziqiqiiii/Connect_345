@@ -94,6 +94,12 @@
                     "type": "DiskFile",
                     "path": "source/test_compare.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/mux4.luc"
+                }
             }
         ],
         "constraintFiles": [

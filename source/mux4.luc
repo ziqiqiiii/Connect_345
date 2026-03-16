@@ -1,0 +1,16 @@
+module mux4 (
+    input in[4],
+    input s0,
+    input s1,
+    output out
+) {
+    always {
+        case (c{s1, s0}) {
+            2b00: out = in[0]
+            2b01: out = in[1]
+            2b10: out = in[2]
+            2b11: out = in[3]
+            default: out = 0
+        }
+    }
+}
