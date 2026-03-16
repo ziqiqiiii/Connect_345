@@ -124,6 +124,12 @@
                     "type": "DiskFile",
                     "path": "source/x_bit_left_shifter.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/left_shifter.luc"
+                }
             }
         ],
         "constraintFiles": [
