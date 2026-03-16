@@ -142,6 +142,12 @@
                     "type": "DiskFile",
                     "path": "source/shifter.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/test_shifter.luc"
+                }
             }
         ],
         "constraintFiles": [
