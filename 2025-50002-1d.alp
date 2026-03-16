@@ -118,6 +118,12 @@
                     "type": "DiskFile",
                     "path": "source/mux2.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/x_bit_left_shifter.luc"
+                }
             }
         ],
         "constraintFiles": [
