@@ -112,6 +112,12 @@
                     "type": "DiskFile",
                     "path": "source/test_boolean.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/mux2.luc"
+                }
             }
         ],
         "constraintFiles": [
