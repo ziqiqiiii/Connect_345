@@ -88,6 +88,12 @@
                     "type": "DiskFile",
                     "path": "source/compare.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/test_compare.luc"
+                }
             }
         ],
         "constraintFiles": [
