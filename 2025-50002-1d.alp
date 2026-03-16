@@ -76,6 +76,12 @@
                     "type": "DiskFile",
                     "path": "source/adder.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/test_adder.luc"
+                }
             }
         ],
         "constraintFiles": [
