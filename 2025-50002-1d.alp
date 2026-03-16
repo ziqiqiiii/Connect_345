@@ -106,6 +106,12 @@
                     "type": "DiskFile",
                     "path": "source/boolean.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/test_boolean.luc"
+                }
             }
         ],
         "constraintFiles": [
