@@ -1,0 +1,15 @@
+module popcount (
+    input a[32],
+    output count[32]
+) {
+
+    sig temp[6]  // max value 32, needs 6 bits
+
+    always {
+        temp = 0
+        repeat(i, 32) {
+            temp = temp + a[i]
+        }
+        count = temp
+    }
+}
