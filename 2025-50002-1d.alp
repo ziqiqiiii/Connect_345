@@ -196,6 +196,12 @@
                     "type": "DiskFile",
                     "path": "source/test_popcount.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/test_score.luc"
+                }
             }
         ],
         "constraintFiles": [

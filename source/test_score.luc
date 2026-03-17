@@ -1,0 +1,32 @@
+testbench test_score {
+    alu alu
+    const TEST_CASES_SCORE = $reverse({
+        // 0: empty board
+        c{32h00000000,   32d0,   6b000011, 32d0},
+        // 1: one horizontal (row0: col0,col1,col2)
+        c{32h00001041,   32d0,   6b000011, 32d1},
+        // 2: one vertical (col0: r0,r1,r2)
+        c{32h00000007,   32d0,   6b000011, 32d1},
+        // 3: horizontal + vertical
+        c{32h00001047,   32d0,   6b000011, 32d2},
+        // 4: full row0 = 3 overlapping horizontals
+        c{32h01041041,   32d0,   6b000011, 32d3},
+        // 5: diagonal \ (col0r2, col1r1, col2r0)
+        c{32h00001084,   32d0,   6b000011, 32d1},
+        // 6: diagonal / (col0r0, col1r1, col2r2)
+        c{32h00004081,   32d0,   6b000011, 32d1},
+        // 7: triangle board = 19
+        c{32h1F79C610,   32d0,   6b000011, 32d19}
+    })
+
+    test scoreTest {
+        repeat(i, 8) {
+            alu.a = TEST_CASES_SCORE[i][101:70]
+            alu.b = TEST_CASES_SCORE[i][69:38]
+            alu.alufn = TEST_CASES_SCORE[i][37:32]
+            $tick()
+            $assert(alu.out == TEST_CASES_SCORE[i][31:0])
+            $print("PASS score test case: %d", i+1)
+        }
+    }
+}
