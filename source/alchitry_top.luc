@@ -29,7 +29,8 @@ module alchitry_top (
     }
     
     const CLK_FREQ = $is_sim() ? 1000 : 100000000 // put 1000 for sim, 100000000 otherwise in hardware
-
+    tester_manual_alu alu_manual(.clk(clk), .rst(rst), .io_button(io_button), .io_dip(io_dip), #CLK_FREQ(CLK_FREQ))
+    
     always {
         reset_cond.in = ~rst_n  // input raw inverted reset signal
         rst = reset_cond.out    // conditioned reset

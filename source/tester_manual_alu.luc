@@ -1,0 +1,134 @@
+module tester_manual_alu#(
+    CLK_FREQ ~ 1000 : CLK_FREQ > 0) 
+(
+    input clk,  // clock
+    input rst,  // reset
+    input io_button[5],
+    input io_dip[3][8],
+    output io_led[3][8],
+    output io_segment[8],
+    output io_select[4]
+) {
+    alu alu
+    #CLK_FREQ($is_sim() ? 1000 : 100000000){
+        button_conditioner button[5](.clk(5x{clk}), .in(io_button))
+    }
+    edge_detector button_edge[5](#RISE(5x{{1}}),#FALL(5x{{0}}),.clk(5x{clk}),.in(button.out))
+    
+    dff state[3](.clk(clk),.rst(rst),#INIT(3b001))
+    dff operand0[32](.clk(clk),.rst(rst),#INIT(0))
+    dff operand1[32](.clk(clk),.rst(rst),#INIT(0))
+    dff result[32](.clk(clk),.rst(rst),#INIT(0))
+    dff digit_counter[20](.clk(clk),.rst(rst),#INIT(0))
+    
+    sig char1[8]
+    sig char2[8]
+    
+    always {
+        // default values
+        alu.a = 0
+        alu.b = 0
+        alu.alufn = 0
+        io_led = 3x{{8h0}}
+        char1 = 0
+        char2 = 0
+        
+        // real code starts here
+        state.d=state.q
+        operand0.d=operand0.q
+        operand1.d=operand1.q
+        
+        // 7-segment display: show state name (a1, a2, b1, b2, O1, O2)
+        case (state.q) {
+            3d1: char1 = 8h5F; char2 = 8h06;   // a1
+            3d2: char1 = 8h5F; char2 = 8h5B;   // a2
+            3d3: char1 = 8h7C; char2 = 8h06;   // b1
+            3d4: char1 = 8h7C; char2 = 8h5B;   // b2
+            3d5: char1 = 8h5C; char2 = 8h06;   // O1
+            3d6: char1 = 8h5C; char2 = 8h5B;   // O2
+            default: char1 = 0; char2 = 0;
+        }
+        
+        // multiplex: rapidly alternate between two digits
+        digit_counter.d = digit_counter.q + 1
+        
+        if (digit_counter.q[$is_sim() ? 3 : 19]) {
+            io_select = ~4b0010     // select second digit
+            io_segment = ~char1      // show left character
+        } else {
+            io_select = ~4b0001     // select first digit
+            io_segment = ~char2      // show right character
+        }
+        
+        // LED display: show stored values or result depending on state
+        io_led[2][7:5]=state.q
+        if(state.q==3d1){
+            io_led[1]=operand0.q[31:24]
+            io_led[0]=operand0.q[23:16]
+        }
+        if(state.q==3d2){
+            io_led[1]=operand0.q[15:8]
+            io_led[0]=operand0.q[7:0]
+        }
+        if(state.q==3d3){
+            io_led[1]=operand1.q[31:24]
+            io_led[0]=operand1.q[23:16]
+        }
+        if(state.q==3d4){
+            io_led[1]=operand1.q[15:8]
+            io_led[0]=operand1.q[7:0]
+        }
+        if(state.q==3d5){
+            io_led[1]=result.q[31:24]
+            io_led[0]=result.q[23:16]
+        }
+        if(state.q==3d6){
+            io_led[1]=result.q[15:8]
+            io_led[0]=result.q[7:0]
+        }
+        
+        // button 1 (center): store current dip values
+        if(button_edge.out[1])
+        {
+            if(state.q==3d1){
+                operand0.d[31:24]=io_dip[1]
+                operand0.d[23:16]=io_dip[0]
+            }
+            if(state.q==3d2){
+                operand0.d[15:8]=io_dip[1]
+                operand0.d[7:0]=io_dip[0]
+            }
+            if(state.q==3d3){
+                operand1.d[31:24]=io_dip[1]
+                operand1.d[23:16]=io_dip[0]
+            }
+            if(state.q==3d4){
+                operand1.d[15:8]=io_dip[1]
+                operand1.d[7:0]=io_dip[0]
+            }
+        }
+        
+        // button 3 (left): previous state
+        if(button_edge.out[3]){
+            if(state.q!=3d1){
+                state.d=state.q-1
+            }
+        }
+        
+        // button 4 (right): next state
+        if(button_edge.out[4]){
+            if(state.q!=3d6){
+                state.d=state.q+1
+            }
+        }
+        
+        // connect ALU
+        alu.a=operand0.q
+        alu.b=operand1.q
+        alu.alufn=io_dip[2][5:0]
+        
+        result.d[31:16]=alu.out[31:16]
+        result.d[15:0]=alu.out[15:0]
+        io_led[2][2:0]=c{alu.z,alu.v,alu.n}
+    }
+}

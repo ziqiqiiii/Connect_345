@@ -172,6 +172,12 @@
                     "type": "DiskFile",
                     "path": "source/test_alu.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/tester_manual_alu.luc"
+                }
             }
         ],
         "constraintFiles": [
