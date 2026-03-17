@@ -3,6 +3,7 @@ module automated_alu_tester (
     input rst,  // reset
     input start_button,
     input start_io_dip,
+    input force_error,       
     output index[5],
     output state_debug[2],
     output running,
@@ -12,7 +13,6 @@ module automated_alu_tester (
     counter slow_clock(#DIV(8), .clk(clk), .rst(rst), #SIZE(1))
     automated_alu_tester_fsm fsm(.clk(clk), .rst(rst))
     automated_alu_tester_datapath datapath(.clk(clk), .rst(rst))
-    
 
     always {
         fsm.slowclk = slow_clock.value
@@ -23,13 +23,11 @@ module automated_alu_tester (
         datapath.index_load_zero = fsm.index_load_zero
         datapath.index_inc = fsm.index_inc
         datapath.sample_enable = fsm.sample_enable
-        datapath.force_error = fsm.error
+        datapath.force_error = fsm.error | force_error
         
         index = datapath.index
         state_debug = fsm.state_debug
         running = fsm.running
         last_index = datapath.last_index
-        
-        
     }
 }

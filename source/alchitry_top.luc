@@ -41,8 +41,9 @@ module alchitry_top (
         alu_tester.start_button = io_button[2]
         alu_tester.start_io_dip = io_dip[2][7]
         led[1:0] = alu_tester.state_debug[1:0]
-        led[6] = alu_tester.running
+        io_led[2][3] = alu_tester.running
         led[7] = alu_tester.last_index
-        led[5:2] = alu_tester.index
+        led[6:2] = alu_tester.index
+        alu_tester.force_error = io_dip[2][6]
     }
 }
