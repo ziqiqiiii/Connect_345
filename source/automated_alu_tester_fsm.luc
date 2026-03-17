@@ -1,0 +1,89 @@
+module automated_alu_tester_fsm (
+    input clk,  // clock
+    input rst,  // reset
+    input slowclk, 
+    input start_press, 
+    input equal,
+    input last_index,
+    output index_load_zero, 
+    output index_inc,
+    output sample_enable, 
+    output running,
+    output error, 
+    output state_debug[2] // will be connected to led[5:0], i.e. only lower 6 bits used -- optional but helpful for debugging
+) { 
+    
+    enum States {
+        IDLE, 
+        INIT, 
+        INC,
+        WAIT_1, 
+        WAIT_2, 
+        CHECK,
+        HALT_ERROR
+    }
+    
+    
+    dff states[$width(States)](.clk(clk), .rst(rst), #INIT(States.IDLE))
+    sig slowclk_edge_rise
+    sig start_press_edge_rise
+    
+    edge_detector slowclk_edge(#RISE(1), #FALL(0), .clk(clk), .in(slowclk))
+    edge_detector start_press_edge(#RISE(1), #FALL(0), .clk(clk), .in(start_press))
+    
+    always {
+        
+        // place default output values of FSM here
+        index_load_zero = 0
+        index_inc = 0
+        sample_enable = 0
+        running = 0
+        error = 0
+        state_debug = 0
+        
+        // outputs of edge detector modules 
+        slowclk_edge_rise = slowclk_edge.out
+        start_press_edge_rise = start_press_edge.out
+        
+        // use Moore FSM diagram to implement state transitions and set new output values where necessary
+        case (states.q){
+            States.IDLE:
+                state_debug = 2b01
+                if(start_press_edge_rise){
+                    states.d = States.INIT
+                }
+                
+            States.INIT:
+                index_load_zero = 1
+                states.d = States.WAIT_1
+                
+            States.WAIT_1:
+                running = 1
+                sample_enable = 1
+                states.d = States.WAIT_2
+                
+            States.WAIT_2:
+                running = 1
+                sample_enable = 1
+                states.d = States.CHECK
+                
+            States.CHECK:
+                running = 1
+                state_debug = 2b01
+                if(slowclk_edge_rise & equal & ~last_index) states.d = States.INC
+                else if(slowclk_edge_rise & ~equal) states.d = States.HALT_ERROR
+                else if(slowclk_edge_rise & equal & last_index) states.d = States.IDLE
+                
+            States.INC:
+                running = 1
+                index_inc = 1
+                states.d = States.WAIT_1
+                
+            States.HALT_ERROR:
+                state_debug = 2b11
+                error = 1
+                if(start_press_edge_rise) states.d = States.INIT
+        }
+        
+    }
+}

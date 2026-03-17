@@ -181,6 +181,42 @@
             },
             {
                 "file": {
+                    "type": "DiskFile",
+                    "path": "source/automated_alu_tester.luc"
+                }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/automated_alu_tester_fsm.luc"
+                }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/automated_alu_tester_datapath.luc"
+                }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/alu_test_values.luc"
+                }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/reg_en.luc"
+                }
+            },
+            {
+                "file": {
+                    "type": "Component",
+                    "path": "Miscellaneous/pipeline.luc"
+                }
+            },
+            {
+                "file": {
                     "type": "Component",
                     "path": "Conditioning/button_conditioner.luc"
                 }
