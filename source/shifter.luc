@@ -4,45 +4,73 @@ module shifter (
     input alufn[6],
     output shift[32]
 ) {
-    // SHL path: direct left shift with 0 padding
-    left_shifter shl_unit
-
-    // SHR/SRA path: reverse input -> left shift -> reverse output
-    // Right shift = reverse bits, left shift, reverse bits back
-    bit_reverse rev_in
-    left_shifter shr_unit
-    bit_reverse rev_out
-
+    
+    bit_reverse reverse_in(#SIZE(32));
+    bit_reverse reverse_out(#SIZE(32));
+    
+    sig pad;
+    sig to_shift[32];
+    sig s16[32];
+    sig s8[32];
+    sig s4[32];
+    sig s2[32];
+    sig s1[32];
+    
     always {
-        // --- SHL path ---
-        shl_unit.a   = a
-        shl_unit.b   = b
-        shl_unit.pad = 0          // vacated bits always 0 for SHL
-
-        // --- SHR / SRA path ---
-        // Step 1: reverse the input bits so a right shift becomes a left shift
-        rev_in.in    = a
-
-        // Step 2: left-shift the reversed bits
-        shr_unit.a   = rev_in.reversed
-        shr_unit.b   = b
-        // alufn[1]=1 only for SRA (ALUFN 0x23 = 100011), so pad with sign bit only then
-        // alufn[1]=0 for SHR (ALUFN 0x21 = 100001), so pad with 0
-        shr_unit.pad = alufn[1] & a[31]
-
-        // Step 3: reverse the shifted result to get the right-shifted output
-        rev_out.in   = shr_unit.shl
-
-        // --- Output MUX: ALUFN[1:0] selects operation ---
-        // SHL = 2b00  (ALUFN[5:0] = 100000)
-        // SHR = 2b01  (ALUFN[5:0] = 100001)
-        // SRA = 2b11  (ALUFN[5:0] = 100011)
-        shift = 0
-        case (alufn[1:0]) {
-            2b00: shift = shl_unit.shl       // SHL: left shift, zeros fill right
-            2b01: shift = rev_out.reversed    // SHR: logical right shift, zeros fill left
-            2b11: shift = rev_out.reversed    // SRA: arithmetic right shift, sign bit fills left
-            default: shift = 0
+        // Step 1: compute pad bit
+        pad = alufn[1] & a[31];
+        
+        // Step 2: if right shift, reverse input first
+        reverse_in.in = a;
+        if (alufn[0]) {
+            to_shift = reverse_in.reversed;  // right shift
+        } else {
+            to_shift = a;                     // left shift
+        }
+        
+        // Step 3: five cascading left-shift stages
+        
+        // shift by 16?
+        if (b[4]) {
+            s16 = c{to_shift[15:0], 16x{pad}};
+        } else {
+            s16 = to_shift;
+        }
+        
+        // shift by 8?
+        if (b[3]) {
+            s8 = c{s16[23:0], 8x{pad}};
+        } else {
+            s8 = s16;
+        }
+        
+        // shift by 4?
+        if (b[2]) {
+            s4 = c{s8[27:0], 4x{pad}};
+        } else {
+            s4 = s8;
+        }
+        
+        // shift by 2?
+        if (b[1]) {
+            s2 = c{s4[29:0], 2x{pad}};
+        } else {
+            s2 = s4;
+        }
+        
+        // shift by 1?
+        if (b[0]) {
+            s1 = c{s2[30:0], 1x{pad}};
+        } else {
+            s1 = s2;
+        }
+        
+        // Step 4: if right shift, reverse output back
+        reverse_out.in = s1;
+        if (alufn[0]) {
+            shift = reverse_out.reversed;  // right shift
+        } else {
+            shift = s1;                     // left shift
         }
     }
 }
