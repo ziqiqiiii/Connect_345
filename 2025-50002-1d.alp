@@ -178,6 +178,12 @@
                     "type": "DiskFile",
                     "path": "source/tester_manual_alu.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "Component",
+                    "path": "Conditioning/button_conditioner.luc"
+                }
             }
         ],
         "constraintFiles": [
