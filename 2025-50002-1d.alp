@@ -148,6 +148,7 @@
                     "type": "DiskFile",
                     "path": "source/test_shifter.luc"
                 }
+            },
             {
                 "file": {
                     "type": "DiskFile",
