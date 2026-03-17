@@ -5,19 +5,15 @@ module compare (
     input alufn[6],
     output cmp
 ) {
+    sig less_than
     always {
-        // implement comparison logic here
-        case (alufn[2:1]){
-            // equals
-            b01: cmp = z            // a - b = 0?
-
-            // signed less than
-            b10: cmp = n ^ v        // 3,5 , -120,10
-
-            //signed leq
-            b11: cmp = z | (n ^ v)
-
-            default: cmp = 0
+        less_than = n ^ v;
+        
+        case (alufn[2:1]) {
+            2b01: cmp = z;                    // CMPEQ
+            2b10: cmp = less_than;            // CMPLT
+            2b11: cmp = z | less_than;        // CMPLE
+            default: cmp = 0;
         }
     }
 }

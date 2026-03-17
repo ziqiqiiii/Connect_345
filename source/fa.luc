@@ -1,4 +1,4 @@
-// A full adder combinational logic unit
+// A full adder combinational logic unit 
 module fa (
     input a,
     input b,
@@ -7,7 +7,8 @@ module fa (
     output cout
 ) {
     always {
-        s = a ^ b ^ cin
-        cout = (a & b) | (b & cin) | (a & cin)
+        // implement 1-bit full adder logic here
+        s = a ^ b ^ cin;
+        cout = (a & b) | (cin & (a ^ b));
     }
 }

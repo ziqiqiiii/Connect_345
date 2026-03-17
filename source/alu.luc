@@ -8,7 +8,7 @@ module alu (
     output n
 ) {
 
-    // instantiate all units
+    // instantiate all 7 units
     adder adder(#SIZE(32))
     compare compare
     boolean boolean(#SIZE(32))
@@ -18,7 +18,7 @@ module alu (
     popcount popcount
 
     always {
-        // connect inputs to ALL units
+        // connect inputs to ALL units (they all run simultaneously)
         adder.a = a
         adder.b = b
         adder.alufn0 = alufn[0]
@@ -67,7 +67,7 @@ module alu (
                 }
             2b01: out = boolean.bool             // ALUFN=01xxxx
             2b10: out = shifter.shift            // ALUFN=10xxxx
-            2b11: out = c{31b0, compare.cmp}     // ALUFN=11xxxx
+            2b11: out = c{31b0, compare.cmp}     // ALUFN=11xxxx, pad output to 32 bits
             default: out = 0
         }
     }
