@@ -7,53 +7,68 @@ module alu (
     output v,
     output n
 ) {
-    // instantiate all 5 units
-    adder adder(#SIZE(32));
-    compare compare;
-    boolean boolean(#SIZE(32));
-    shifter shifter;
-    multiplier multiplier;
+
+    // instantiate all units
+    adder adder(#SIZE(32))
+    compare compare
+    boolean boolean(#SIZE(32))
+    shifter shifter
+    multiplier multiplier
+    score score
+    popcount popcount
 
     always {
-        // connect inputs to ALL units (they all run simultaneously)
-        adder.a = a;
-        adder.b = b;
-        adder.alufn0 = alufn[0];
+        // connect inputs to ALL units
+        adder.a = a
+        adder.b = b
+        adder.alufn0 = alufn[0]
 
-        compare.z = adder.z;
-        compare.v = adder.v;
-        compare.n = adder.n;
-        compare.alufn = alufn;
+        compare.z = adder.z
+        compare.v = adder.v
+        compare.n = adder.n
+        compare.alufn = alufn
 
-        boolean.a = a;
-        boolean.b = b;
-        boolean.alufn = alufn;
+        boolean.a = a
+        boolean.b = b
+        boolean.alufn = alufn
 
-        shifter.a = a;
-        shifter.b = b[4:0];
-        shifter.alufn = alufn;
+        shifter.a = a
+        shifter.b = b[4:0]
+        shifter.alufn = alufn
 
-        multiplier.a = a;
-        multiplier.b = b;
+        multiplier.a = a
+        multiplier.b = b
+
+        score.a = a
+
+        popcount.a = a
 
         // Z, V, N always come from adder
-        z = adder.z;
-        v = adder.v;
-        n = adder.n;
+        z = adder.z
+        v = adder.v
+        n = adder.n
 
         // ALUFN[5:4] selects which unit's output
         case (alufn[5:4]) {
             2b00:
-                // adder or multiplier?
-                if (alufn[1]) {
-                    out = multiplier.mul;
+                // 000000 = ADD
+                // 000001 = SUB
+                // 000010 = MUL
+                // 000011 = SCORE
+                // 000100 = POPCOUNT
+                if (alufn[2]) {
+                    out = popcount.count         // ALUFN=0001xx
+                } else if (alufn[1] & alufn[0]) {
+                    out = score.result           // ALUFN=000011
+                } else if (alufn[1]) {
+                    out = multiplier.mul         // ALUFN=000010
                 } else {
-                    out = adder.s;
+                    out = adder.s                // ALUFN=00000x
                 }
-            2b01: out = boolean.bool;
-            2b10: out = shifter.shift;
-            2b11: out = c{31b0, compare.cmp};  // pad to 32 bits
-            default: out = 0;
+            2b01: out = boolean.bool             // ALUFN=01xxxx
+            2b10: out = shifter.shift            // ALUFN=10xxxx
+            2b11: out = c{31b0, compare.cmp}     // ALUFN=11xxxx
+            default: out = 0
         }
     }
 }
