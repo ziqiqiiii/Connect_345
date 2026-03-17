@@ -160,6 +160,12 @@
                     "type": "DiskFile",
                     "path": "source/test_multiplier.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/alu.luc"
+                }
             }
         ],
         "constraintFiles": [

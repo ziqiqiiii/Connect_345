@@ -1,0 +1,59 @@
+module alu (
+    input a[32],
+    input b[32],
+    input alufn[6],
+    output out[32],
+    output z,
+    output v,
+    output n
+) {
+    // instantiate all 5 units
+    adder adder(#SIZE(32));
+    compare compare;
+    boolean boolean(#SIZE(32));
+    shifter shifter;
+    multiplier multiplier;
+
+    always {
+        // connect inputs to ALL units (they all run simultaneously)
+        adder.a = a;
+        adder.b = b;
+        adder.alufn0 = alufn[0];
+
+        compare.z = adder.z;
+        compare.v = adder.v;
+        compare.n = adder.n;
+        compare.alufn = alufn;
+
+        boolean.a = a;
+        boolean.b = b;
+        boolean.alufn = alufn;
+
+        shifter.a = a;
+        shifter.b = b[4:0];
+        shifter.alufn = alufn;
+
+        multiplier.a = a;
+        multiplier.b = b;
+
+        // Z, V, N always come from adder
+        z = adder.z;
+        v = adder.v;
+        n = adder.n;
+
+        // ALUFN[5:4] selects which unit's output
+        case (alufn[5:4]) {
+            2b00:
+                // adder or multiplier?
+                if (alufn[1]) {
+                    out = multiplier.mul;
+                } else {
+                    out = adder.s;
+                }
+            2b01: out = boolean.bool;
+            2b10: out = shifter.shift;
+            2b11: out = c{31b0, compare.cmp};  // pad to 32 bits
+            default: out = 0;
+        }
+    }
+}
