@@ -1,0 +1,48 @@
+module regfile (
+    input clk,
+    input rst,
+    input we,           // write enable
+    input wa[4],        // write address (4-bit, 0-12)
+    input wd[32],       // write data
+    input ra1[4],       // read address port 1 (ALU input A)
+    input ra2[4],       // read address port 2 (ALU input B)
+    
+    // 2 addressable combinational READ ports
+    output rd1[32],     // read data port 1
+    output rd2[32],     // read data port 2
+    
+    // 6 fixed combinational READ ports (always output, wired to display)
+    output r0_data[32], // Player 1's Board  (R0)
+    output r1_data[32], // Player 2's Board  (R1)
+    output r2_data[32], // Current Column    (R2)
+    output r3_data[32], // Current Player Turn (R3)
+    output r4_data[32], // Player 1's Score  (R4)
+    output r5_data[32]  // Player 2's Score  (R5)
+) {
+    
+    .clk(clk) {
+        .rst(rst) {
+            dff regs[13][32]    // 13 registers, each 32-bit wide
+        }
+    }
+    
+    always {
+        // ── Addressable READ ports (combinational) ──────────────────────────
+        rd1 = regs.q[ra1]
+        rd2 = regs.q[ra2]
+        
+        // ── Fixed READ ports (combinational, always show output) ────────────
+        r0_data = regs.q[0]   // Player 1's Board
+        r1_data = regs.q[1]   // Player 2's Board
+        r2_data = regs.q[2]   // Current Column
+        r3_data = regs.q[3]   // Current Player Turn
+        r4_data = regs.q[4]   // Player 1's Score
+        r5_data = regs.q[5]   // Player 2's Score
+        
+        // ── WRITE port (synchronous) ────────────────────────────────────────
+        regs.d = regs.q      // default: hold all values
+        if (we && wa < 13) {
+            regs.d[wa] = wd  // write to addressed register on clock edge
+        }
+    }
+}
