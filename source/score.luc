@@ -1,0 +1,33 @@
+module score (
+    input a[32],
+    output result[32]
+) {
+
+    sig horizontal[32]
+    sig vertical[32]
+    sig diag_down[32]
+    sig diag_up[32]
+
+    // reuse popcount module — one per direction
+    popcount pop_h
+    popcount pop_v
+    popcount pop_d1
+    popcount pop_d2
+
+    always {
+        // detect 3-in-a-row patterns
+        horizontal = a & (a >> 6) & (a >> 12)
+        vertical   = a & (a >> 1) & (a >> 2)
+        diag_down  = a & (a >> 5) & (a >> 10)
+        diag_up    = a & (a >> 7) & (a >> 14)
+
+        // count using popcount module
+        pop_h.a = horizontal
+        pop_v.a = vertical
+        pop_d1.a = diag_down
+        pop_d2.a = diag_up
+
+        // total score
+        result = pop_h.count + pop_v.count + pop_d1.count + pop_d2.count
+    }
+}

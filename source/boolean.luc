@@ -1,0 +1,23 @@
+module boolean #(
+    SIZE = 32 : SIZE > 0
+)(
+    input a[SIZE],
+    input b[SIZE],
+    input alufn[6],
+    output bool[SIZE]
+) {
+    mux4 mux[SIZE]  // 32 copies of 4-to-1 MUX
+
+    always {
+        // same ALUFN[3:0] goes to all 32 MUXes as data inputs
+        mux.in = 32x{{alufn[3:0]}};
+        
+        // each MUX gets its own A[i] and B[i] as selector
+        repeat(i, 32) {
+            mux.s[i] = c{b[i], a[i]};
+        }
+        
+        // collect all 32 outputs
+        bool = mux.out;
+    }
+}

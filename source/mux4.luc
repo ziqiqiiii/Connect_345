@@ -1,0 +1,15 @@
+module mux4 (
+    input in[4],    // 4 data inputs
+    input s[2],     // 2-bit selector
+    output out
+) {
+    always {
+        case (s) {
+            2b00: out = in[0];
+            2b01: out = in[1];
+            2b10: out = in[2];
+            2b11: out = in[3];
+            default: out = 0;
+        }
+    }
+}

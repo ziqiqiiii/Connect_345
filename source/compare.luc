@@ -1,0 +1,19 @@
+module compare (
+    input z,
+    input v,
+    input n,
+    input alufn[6],
+    output cmp
+) {
+    sig less_than
+    always {
+        less_than = n ^ v;
+        
+        case (alufn[2:1]) {
+            2b01: cmp = z;                    // CMPEQ
+            2b10: cmp = less_than;            // CMPLT
+            2b11: cmp = z | less_than;        // CMPLE
+            default: cmp = 0;
+        }
+    }
+}

@@ -1,0 +1,32 @@
+testbench test_popcount {
+    alu alu
+    const TEST_CASES_POP = $reverse({
+        // 0: zero bits
+        c{32h00000000,   32d0,   6b000100, 32d0},
+        // 1: one bit
+        c{32h00000001,   32d0,   6b000100, 32d1},
+        // 2: three bits (111)
+        c{32h00000007,   32d0,   6b000100, 32d3},
+        // 3: all 32 bits
+        c{32hFFFFFFFF,   32d0,   6b000100, 32d32},
+        // 4: alternating = 16 bits
+        c{32hAAAAAAAA,   32d0,   6b000100, 32d16},
+        // 5: lower 16 bits ON
+        c{32h0000FFFF,   32d0,   6b000100, 32d16},
+        // 6: one byte full
+        c{32h000000FF,   32d0,   6b000100, 32d8},
+        // 7: scattered bits (0x12345678 = 13 ones)
+        c{32h12345678,   32d0,   6b000100, 32d13}
+    })
+
+    test popcountTest {
+        repeat(i, 8) {
+            alu.a = TEST_CASES_POP[i][101:70]
+            alu.b = TEST_CASES_POP[i][69:38]
+            alu.alufn = TEST_CASES_POP[i][37:32]
+            $tick()
+            $assert(alu.out == TEST_CASES_POP[i][31:0])
+            $print("PASS popcount test case: %d", i+1)
+        }
+    }
+}

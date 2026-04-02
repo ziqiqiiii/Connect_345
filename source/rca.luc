@@ -1,0 +1,27 @@
+module rca #(
+    SIZE ~ 32 : SIZE > 1
+)(
+    input a[SIZE],
+    input b[SIZE],
+    input cin,
+    output cout,
+    output s[SIZE]
+) {
+    
+    fa fa[SIZE];   // instantiate SIZE full adders
+    
+    always {
+        repeat(i, SIZE) {
+            fa.a[i] = a[i];
+            fa.b[i] = b[i];
+            if (i == 0) {
+                fa.cin[i] = cin;       // first FA gets external carry-in
+            } else {
+                fa.cin[i] = fa.cout[i-1]; // chain carry from previous FA
+            }
+        }
+        
+        s = fa.s;              // all sum bits
+        cout = fa.cout[SIZE-1]; // final carry out
+    }
+}
