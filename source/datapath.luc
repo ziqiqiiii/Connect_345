@@ -1,0 +1,108 @@
+module datapath (
+    input clk,
+    input rst,
+
+    // -- Control signals from Control Unit --
+    input ra1[4],       // REGFILE read address port 1
+    input ra2[4],       // REGFILE read address port 2
+    input wa[4],        // REGFILE write address
+    input we,           // REGFILE write enable
+    input alufn[6],     // ALU function select
+    input asel[2],      // ASEL mux select
+    input bsel[3],      // BSEL mux select
+    input wdsel[2],     // WDSEL mux select
+
+    // -- Always-show outputs (fixed read ports from REGFILE) --
+    output p1_board_out[32],      // R0 - Player 1's Board
+    output p2_board_out[32],      // R1 - Player 2's Board
+    output curr_column_out[32],   // R2 - Current Column
+    output curr_player_out[32],   // R3 - Current Player Turn
+    output p1_score_out[32],      // R4 - Player 1's Score
+    output p2_score_out[32]       // R5 - Player 2's Score
+) {
+
+    // ── Sub-module instantiation ─────────────────────────────────────────────
+    regfile regfile(
+        .clk(clk),
+        .rst(rst)
+    )
+
+    alu alu
+
+    // ── Internal signals ─────────────────────────────────────────────────────
+    sig rd1[32]         // REGFILE read data port 1 → feeds ASEL
+    sig rd2[32]         // REGFILE read data port 2 → feeds BSEL
+    sig asel_out[32]    // ASEL mux output → ALU input A
+    sig bsel_out[32]    // BSEL mux output → ALU input B
+    sig alu_out[32]     // ALU output → feeds WDSEL
+    sig wdsel_out[32]   // WDSEL mux output → REGFILE write data (WD)
+
+    always {
+
+        // ── Step 1: Read from REGFILE ────────────────────────────────────────
+        regfile.ra1 = ra1
+        regfile.ra2 = ra2
+        rd1 = regfile.rd1
+        rd2 = regfile.rd2
+
+        // ── Step 2: ASEL mux (2-bit select) ─────────────────────────────────
+        // Input 0: rd1  (from REGFILE)
+        // Input 1: 0x01 (constant 1)
+        // Input 2: 0x00 (constant 0)
+        // Input 3: 0x19 (constant 25 — total cells in 5x5 board)
+        case (asel) {
+            b00 : asel_out = rd1
+            b01 : asel_out = 32h1
+            b10 : asel_out = 32h0
+            b11 : asel_out = 32h19
+            default : asel_out = rd1
+        }
+
+        // ── Step 3: BSEL mux (3-bit select) ─────────────────────────────────
+        // Input 0: rd2  (from REGFILE)
+        // Input 1: 0x00 (constant 0)
+        // Input 2: 0x01 (constant 1)
+        // Input 3: 0x05 (constant 5 — board width/height)
+        // Input 4: 0x06 (constant 6 — bits per row in board encoding)
+        case (bsel) {
+            b000 : bsel_out = rd2
+            b001 : bsel_out = 32h0
+            b010 : bsel_out = 32h1
+            b011 : bsel_out = 32h5
+            b100 : bsel_out = 32h6
+            default : bsel_out = rd2
+        }
+
+        // ── Step 4: ALU ──────────────────────────────────────────────────────
+        alu.alufn = alufn
+        alu.a     = asel_out
+        alu.b     = bsel_out
+        alu_out   = alu.out
+
+        // ── Step 5: WDSEL mux (2-bit select) ────────────────────────────────
+        // Input 0: ALU output
+        // Input 1: 0xFFFF (constant 65535 — draw signal)
+        // Input 2: 0x0000 (constant 0 — reset/clear)
+        // Input 3: 0xF    (constant 15 — win signal)
+        case (wdsel) {
+            b00 : wdsel_out = alu_out
+            b01 : wdsel_out = 32hFFFF
+            b10 : wdsel_out = 32h0
+            b11 : wdsel_out = 32hF
+            default : wdsel_out = alu_out
+        }
+
+        // ── Step 6: Write back to REGFILE (WD now known) ─────────────────────
+        regfile.wa  = wa
+        regfile.we  = we
+        regfile.wd  = wdsel_out
+
+        // ── Step 7: Fixed outputs (always show) ──────────────────────────────
+        p1_board_out    = regfile.p1_board_out
+        p2_board_out    = regfile.p2_board_out
+        curr_column_out = regfile.curr_column_out
+        curr_player_out = regfile.curr_player_out
+        p1_score_out    = regfile.p1_score_out
+        p2_score_out    = regfile.p2_score_out
+    }
+}

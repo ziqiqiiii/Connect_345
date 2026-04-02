@@ -208,6 +208,12 @@
                     "type": "DiskFile",
                     "path": "source/regfile.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/datapath.luc"
+                }
             }
         ],
         "constraintFiles": [
