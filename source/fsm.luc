@@ -1,0 +1,438 @@
+module fsm (
+    input clk,
+    input rst,
+
+    // ── Feedback from datapath ────────────────────────────────────────────────
+    input rd1[32],          // read data port 1 (for WIN_CHECK comparison)
+    input rd2[32],          // read data port 2 (for all branching decisions)
+
+    // ── Fixed outputs from datapath (always available, no ra needed) ──────────
+    input curr_player[32],  // R2 — 0=P1, 1=P2
+    input curr_col[32],     // R3 — 0 to 4
+
+    // ── Button inputs (must be edge-detected before entering FSM) ────────────
+    input btn_p1_left,
+    input btn_p1_right,
+    input btn_p2_left,
+    input btn_p2_right,
+    input btn_drop,         // shared drop button
+
+    // ── Control outputs → datapath ────────────────────────────────────────────
+    output ra1[4],          // REGFILE read address port 1
+    output ra2[4],          // REGFILE read address port 2
+    output wa[4],           // REGFILE write address
+    output we,              // REGFILE write enable
+    output alufn[6],        // ALU function select
+    output asel[2],         // ASEL mux select
+    output bsel[3],         // BSEL mux select
+    output wdsel[2]         // WDSEL mux select
+) {
+
+    // ── ALUFN constants (verified from alu.luc) ───────────────────────────────
+    const ADD          = 6b000000
+    const SUB          = 6b000001
+    const MUL          = 6b000010
+    const ALU_SCORE    = 6b000011
+    const ALU_POPCOUNT = 6b000100
+    const OR           = 6b011110
+    const SHL          = 6b100000
+
+    // ── State enum ────────────────────────────────────────────────────────────
+    enum States {
+        INIT_R0,
+        INIT_R1,
+        INIT_R2,
+        INIT_R3,
+        INIT_R4,
+        INIT_R5,
+        INIT_R6,
+        INIT_R8,
+        INIT_R9,
+        INIT_R10,
+        INIT_R11,
+        INIT_R12,
+        IDLE,
+        MOVE_LEFT_CHECK,
+        MOVE_LEFT_DEC,
+        MOVE_LEFT_WRAP,
+        MOVE_RIGHT_CHECK,
+        MOVE_RIGHT_INC,
+        MOVE_RIGHT_WRAP,
+        VALIDATE_COL,
+        COMPUTE_BIT_0,
+        COMPUTE_BIT_1,
+        COMPUTE_BITMASK,
+        UPDATE_CURR_BOARD,
+        UPDATE_MAIN_BOARD,
+        INCREMENT_HEIGHT,
+        CALC_SCORE,
+        CHECK_MOVE_COUNT,
+        BRANCH_MOVE_COUNT,
+        SWITCH_PLAYER,
+        WIN_CHECK,
+        P1_WINS,
+        P2_WINS,
+        DRAW_0,
+        DRAW_1,
+        GAME_OVER,
+        RESTART_WAIT
+    }
+
+    // ── State register ────────────────────────────────────────────────────────
+    .clk(clk) {
+        .rst(rst) {
+            dff state[$width(States)](#INIT(States.INIT_R0))
+        }
+    }
+
+    always {
+        // ── Safe defaults ─────────────────────────────────────────────────────
+        ra1     = 4d0
+        ra2     = 4d0
+        wa      = 4d0
+        we      = 0
+        alufn   = ADD
+        asel    = 2b00
+        bsel    = 3b000
+        wdsel   = 2b00
+        state.d = state.q
+
+        case (state.q) {
+
+            // ══════════════════════════════════════════════════════════════════
+            // PHASE 0 — INIT
+            // wdsel=b10 writes const 0 to each register, bypassing ALU
+            // ══════════════════════════════════════════════════════════════════
+
+            States.INIT_R0:
+                wa = 4d0
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R1
+
+            States.INIT_R1:
+                wa = 4d1
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R2
+
+            States.INIT_R2:
+                wa = 4d2
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R3
+
+            States.INIT_R3:
+                wa = 4d3
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R4
+
+            States.INIT_R4:
+                wa = 4d4
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R5
+
+            States.INIT_R5:
+                wa = 4d5
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R6
+
+            States.INIT_R6:
+                wa = 4d6
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R8
+
+            States.INIT_R8:
+                wa = 4d8
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R9
+
+            States.INIT_R9:
+                wa = 4d9
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R10
+
+            States.INIT_R10:
+                wa = 4d10
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R11
+
+            States.INIT_R11:
+                wa = 4d11
+                wdsel = 2b10
+                we = 1
+                state.d = States.INIT_R12
+
+            States.INIT_R12:
+                wa = 4d12
+                wdsel = 2b10
+                we = 1
+                state.d = States.IDLE
+
+            // ══════════════════════════════════════════════════════════════════
+            // PHASE 1 — IDLE
+            // ══════════════════════════════════════════════════════════════════
+
+            States.IDLE:
+                if (curr_player == 0) {
+                    if (btn_p1_left)  state.d = States.MOVE_LEFT_CHECK
+                    if (btn_p1_right) state.d = States.MOVE_RIGHT_CHECK
+                    if (btn_drop)     state.d = States.VALIDATE_COL
+                } else {
+                    if (btn_p2_left)  state.d = States.MOVE_LEFT_CHECK
+                    if (btn_p2_right) state.d = States.MOVE_RIGHT_CHECK
+                    if (btn_drop)     state.d = States.VALIDATE_COL
+                }
+
+            // ══════════════════════════════════════════════════════════════════
+            // PHASE 2 — CURSOR MOVEMENT
+            // ══════════════════════════════════════════════════════════════════
+
+            States.MOVE_LEFT_CHECK:
+                ra2 = 4d3
+                if (rd2 == 0) {
+                    state.d = States.MOVE_LEFT_WRAP
+                } else {
+                    state.d = States.MOVE_LEFT_DEC
+                }
+
+            States.MOVE_LEFT_DEC:
+                ra1   = 4d3
+                asel  = 2b00
+                bsel  = 3b010
+                alufn = SUB
+                wa    = 4d3
+                we    = 1
+                state.d = States.IDLE
+
+            States.MOVE_LEFT_WRAP:
+                asel  = 2b11
+                bsel  = 3b001
+                alufn = ADD
+                wa    = 4d3
+                we    = 1
+                state.d = States.IDLE
+
+            States.MOVE_RIGHT_CHECK:
+                ra2 = 4d3
+                if (rd2 == 4) {
+                    state.d = States.MOVE_RIGHT_WRAP
+                } else {
+                    state.d = States.MOVE_RIGHT_INC
+                }
+
+            States.MOVE_RIGHT_INC:
+                ra1   = 4d3
+                asel  = 2b00
+                bsel  = 3b010
+                alufn = ADD
+                wa    = 4d3
+                we    = 1
+                state.d = States.IDLE
+
+            States.MOVE_RIGHT_WRAP:
+                wdsel = 2b10
+                wa    = 4d3
+                we    = 1
+                state.d = States.IDLE
+
+            // ══════════════════════════════════════════════════════════════════
+            // PHASE 3 — DROP SEQUENCE
+            // ══════════════════════════════════════════════════════════════════
+
+            States.VALIDATE_COL:
+                case (curr_col) {
+                    4d0: ra2 = 4d8
+                    4d1: ra2 = 4d9
+                    4d2: ra2 = 4d10
+                    4d3: ra2 = 4d11
+                    4d4: ra2 = 4d12
+                    default: ra2 = 4d8
+                }
+                if (rd2 == 5) {
+                    state.d = States.IDLE
+                } else {
+                    state.d = States.COMPUTE_BIT_0
+                }
+
+            States.COMPUTE_BIT_0:
+                ra1   = 4d3
+                asel  = 2b00
+                bsel  = 3b100
+                alufn = MUL
+                wa    = 4d7
+                we    = 1
+                state.d = States.COMPUTE_BIT_1
+
+            States.COMPUTE_BIT_1:
+                case (curr_col) {
+                    4d0: ra1 = 4d8
+                    4d1: ra1 = 4d9
+                    4d2: ra1 = 4d10
+                    4d3: ra1 = 4d11
+                    4d4: ra1 = 4d12
+                    default: ra1 = 4d8
+                }
+                ra2   = 4d7
+                asel  = 2b00
+                bsel  = 3b000
+                alufn = ADD
+                wa    = 4d7
+                we    = 1
+                state.d = States.COMPUTE_BITMASK
+
+            States.COMPUTE_BITMASK:
+                ra2   = 4d7
+                asel  = 2b01
+                bsel  = 3b000
+                alufn = SHL
+                wa    = 4d7
+                we    = 1
+                state.d = States.UPDATE_CURR_BOARD
+
+            States.UPDATE_CURR_BOARD:
+                if (curr_player == 0) {
+                    ra1 = 4d0
+                    wa  = 4d0
+                } else {
+                    ra1 = 4d1
+                    wa  = 4d1
+                }
+                ra2   = 4d7
+                asel  = 2b00
+                bsel  = 3b000
+                alufn = OR
+                we    = 1
+                state.d = States.UPDATE_MAIN_BOARD
+
+            States.UPDATE_MAIN_BOARD:
+                ra1   = 4d6
+                ra2   = 4d7
+                asel  = 2b00
+                bsel  = 3b000
+                alufn = OR
+                wa    = 4d6
+                we    = 1
+                state.d = States.INCREMENT_HEIGHT
+
+            States.INCREMENT_HEIGHT:
+                case (curr_col) {
+                    4d0: ra1 = 4d8;  wa = 4d8
+                    4d1: ra1 = 4d9;  wa = 4d9
+                    4d2: ra1 = 4d10; wa = 4d10
+                    4d3: ra1 = 4d11; wa = 4d11
+                    4d4: ra1 = 4d12; wa = 4d12
+                    default: ra1 = 4d8; wa = 4d8
+                }
+                asel  = 2b00
+                bsel  = 3b010
+                alufn = ADD
+                we    = 1
+                state.d = States.CALC_SCORE
+
+            // ══════════════════════════════════════════════════════════════════
+            // PHASE 4 — SCORE + MOVE COUNT
+            // ══════════════════════════════════════════════════════════════════
+
+            States.CALC_SCORE:
+                if (curr_player == 0) {
+                    ra1 = 4d0
+                    wa  = 4d4
+                } else {
+                    ra1 = 4d1
+                    wa  = 4d5
+                }
+                asel  = 2b00
+                alufn = ALU_SCORE
+                wdsel = 2b00
+                we    = 1
+                state.d = States.CHECK_MOVE_COUNT
+
+            States.CHECK_MOVE_COUNT:
+                ra1   = 4d6
+                asel  = 2b00
+                alufn = ALU_POPCOUNT
+                wa    = 4d7
+                we    = 1
+                state.d = States.BRANCH_MOVE_COUNT
+
+            States.BRANCH_MOVE_COUNT:
+                ra2 = 4d7
+                if (rd2 == 25) {
+                    state.d = States.WIN_CHECK
+                } else {
+                    state.d = States.SWITCH_PLAYER
+                }
+
+            States.SWITCH_PLAYER:
+                ra2   = 4d2
+                asel  = 2b01
+                bsel  = 3b000
+                alufn = SUB
+                wa    = 4d2
+                we    = 1
+                state.d = States.IDLE
+
+            // ══════════════════════════════════════════════════════════════════
+            // PHASE 5 — WIN CHECK
+            // rd1 and rd2 read simultaneously, compared directly in FSM
+            // ══════════════════════════════════════════════════════════════════
+
+            States.WIN_CHECK:
+                ra1 = 4d4
+                ra2 = 4d5
+                if (rd1 > rd2) {
+                    state.d = States.P1_WINS
+                } else if (rd2 > rd1) {
+                    state.d = States.P2_WINS
+                } else {
+                    state.d = States.DRAW_0
+                }
+
+            // ══════════════════════════════════════════════════════════════════
+            // PHASE 6 — GAME OVER
+            // ══════════════════════════════════════════════════════════════════
+
+            States.P1_WINS:
+                wdsel = 2b11
+                wa    = 4d4
+                we    = 1
+                state.d = States.GAME_OVER
+
+            States.P2_WINS:
+                wdsel = 2b11
+                wa    = 4d5
+                we    = 1
+                state.d = States.GAME_OVER
+
+            States.DRAW_0:
+                wdsel = 2b01
+                wa    = 4d4
+                we    = 1
+                state.d = States.DRAW_1
+
+            States.DRAW_1:
+                wdsel = 2b01
+                wa    = 4d5
+                we    = 1
+                state.d = States.GAME_OVER
+
+            States.GAME_OVER:
+                if (btn_p1_left | btn_p1_right | btn_p2_left | btn_p2_right | btn_drop) {
+                    state.d = States.RESTART_WAIT
+                }
+
+            States.RESTART_WAIT:
+                if (!btn_p1_left & !btn_p1_right & !btn_p2_left & !btn_p2_right & !btn_drop) {
+                    state.d = States.INIT_R0
+                }
+        }
+    }
+}
