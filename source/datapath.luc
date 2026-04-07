@@ -15,10 +15,12 @@ module datapath (
     // -- Always-show outputs (fixed read ports from REGFILE) --
     output p1_board_out[32],      // R0 - Player 1's Board
     output p2_board_out[32],      // R1 - Player 2's Board
-    output curr_column_out[32],   // R2 - Current Column
-    output curr_player_out[32],   // R3 - Current Player Turn
+    output curr_column_out[32],   // R3 - Current Column
+    output curr_player_out[32],   // R2 - Current Player Turn
     output p1_score_out[32],      // R4 - Player 1's Score
-    output p2_score_out[32]       // R5 - Player 2's Score
+    output p2_score_out[32],       // R5 - Player 2's Score
+    output rd1_out[32],
+    output rd2_out[32]
 ) {
 
     // ── Sub-module instantiation ─────────────────────────────────────────────
@@ -44,6 +46,8 @@ module datapath (
         regfile.ra2 = ra2
         rd1 = regfile.rd1
         rd2 = regfile.rd2
+        rd1_out = rd1
+        rd2_out = rd2
 
         // ── Step 2: ASEL mux (2-bit select) ─────────────────────────────────
         // Input 0: rd1  (from REGFILE)
@@ -54,7 +58,7 @@ module datapath (
             b00 : asel_out = rd1
             b01 : asel_out = 32h1
             b10 : asel_out = 32h0
-            b11 : asel_out = 32h19
+            b11 : asel_out = 32h4
             default : asel_out = rd1
         }
 
