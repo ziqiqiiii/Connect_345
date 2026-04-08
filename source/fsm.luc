@@ -71,7 +71,7 @@ module fsm (
     .clk(clk) {
         .rst(rst) {
             dff state[$width(States)](#INIT(States.INIT))
-            dff init_counter[3](#INIT(0))
+            dff init_counter[4](#INIT(0))
         }
     }
 
