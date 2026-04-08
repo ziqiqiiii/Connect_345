@@ -1,0 +1,6 @@
+PINOUT(V1), STANDARD(LVCMOS33) {
+    pin data C40
+    PULL(UP) {
+        pin btn_red C39
+    }
+}

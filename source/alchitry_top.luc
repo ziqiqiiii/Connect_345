@@ -1,49 +1,91 @@
 module alchitry_top (
-    input clk,              // 100MHz clock
-    input rst_n,            // reset button (active low)
-    output led[8],          // 8 user controllable LEDs
-    input usb_rx,            // USB->Serial input
-    output usb_tx,           // USB->Serial output
-    output io_led[3][8],     // LEDs on IO Shield
-    output io_segment[8],        // 7-segment LEDs on IO Shield
-    output io_select[4],        // Digit select on IO Shield
-    input io_button[5],      // 5 buttons on IO Shield
-    input io_dip[3][8]       // DIP switches on IO Shield
+    input clk,
+    input rst_n,
+    output led[8],
+    input usb_rx,
+    output usb_tx,
+    output io_led[3][8],
+    output io_segment[8],
+    output io_select[4],
+    input io_button[5],
+    input io_dip[3][8],
+    output data              // WS2812B data line C40
 ) {
-    
-    sig rst                 // reset signal
-    
-    .clk(clk) {
-        // The reset conditioner is used to synchronize the reset signal to the FPGA
-        // clock. This ensures the entire FPGA comes out of reset at the same time.
-        reset_conditioner reset_cond
-    }
-    const CLK_FREQ = $is_sim() ? 1000 : 100000000 // put 1000 for sim, 100000000 otherwise in hardware
-    
-    tester_manual_alu alu_manual(.clk(clk), .rst(rst), .io_button(io_button), .io_dip(io_dip), #CLK_FREQ(CLK_FREQ))
-    automated_alu_tester alu_tester(.clk(clk), .rst(rst))
-   
-    
-    always {
-        reset_cond.in = ~rst_n  // input raw inverted reset signal
-        rst = reset_cond.out    // conditioned reset
-        
-        led = 8h00             // turn LEDs off
-        
-        usb_tx = usb_rx          // loop serial port
-        
+    const CLK_FREQ = $is_sim() ? 1000 : 100000000
+    const PIXEL_COUNT = 90
 
-        // to test ALU 
-        io_segment = alu_manual.io_segment
-        io_select = alu_manual.io_select         
-        io_led = alu_manual.io_led
-        
-        alu_tester.start_button = io_button[2]
-        alu_tester.start_io_dip = io_dip[2][7]
-        led[1:0] = alu_tester.state_debug[1:0]
-        io_led[2][3] = alu_tester.running
-        led[7] = alu_tester.last_index
-        led[6:2] = alu_tester.index
-        alu_tester.force_error = io_dip[2][6]
+    sig rst
+
+    .clk(clk) {
+        reset_conditioner reset_cond
+
+        // ── Button conditioners ───────────────────────────────────
+        button_conditioner btn0(#CLK_FREQ(CLK_FREQ), .in(io_button[0]))  // P1 left
+        button_conditioner btn1(#CLK_FREQ(CLK_FREQ), .in(io_button[1]))  // drop
+        button_conditioner btn2(#CLK_FREQ(CLK_FREQ), .in(io_button[2]))  // P1 right
+        button_conditioner btn3(#CLK_FREQ(CLK_FREQ), .in(io_button[3]))  // P2 left
+        button_conditioner btn4(#CLK_FREQ(CLK_FREQ), .in(io_button[4]))  // P2 right
+
+        // ── Edge detectors ────────────────────────────────────────
+        edge_detector edge0(#RISE(1), #FALL(0), .in(btn0.out))
+        edge_detector edge1(#RISE(1), #FALL(0), .in(btn1.out))
+        edge_detector edge2(#RISE(1), #FALL(0), .in(btn2.out))
+        edge_detector edge3(#RISE(1), #FALL(0), .in(btn3.out))
+        edge_detector edge4(#RISE(1), #FALL(0), .in(btn4.out))
+
+        .rst(rst) {
+            // ── Core modules ──────────────────────────────────────
+            datapath dp
+            fsm game_fsm
+            ws2812b_driver driver(#PIXEL_COUNT(PIXEL_COUNT))
+        }
+    }
+    game_display display
+
+    always {
+        reset_cond.in = ~rst_n
+        rst = reset_cond.out
+
+        // ── Unused outputs ────────────────────────────────────────
+        usb_tx     = usb_rx
+        led        = 8h00
+        io_segment = 8hff
+        io_select  = 4hf
+        io_led     = 3x{{8h00}}
+
+        // ── Wire FSM → Datapath ───────────────────────────────────
+        dp.ra1   = game_fsm.ra1
+        dp.ra2   = game_fsm.ra2
+        dp.wa    = game_fsm.wa
+        dp.we    = game_fsm.we
+        dp.alufn = game_fsm.alufn
+        dp.asel  = game_fsm.asel
+        dp.bsel  = game_fsm.bsel
+        dp.wdsel = game_fsm.wdsel
+
+        // ── Wire Datapath → FSM ───────────────────────────────────
+        game_fsm.rd1         = dp.rd1_out
+        game_fsm.rd2         = dp.rd2_out
+        game_fsm.curr_player = dp.curr_player_out
+        game_fsm.curr_col    = dp.curr_column_out
+
+        // ── Wire Buttons → FSM ────────────────────────────────────
+        game_fsm.btn_p1_left  = edge0.out
+        game_fsm.btn_drop     = edge1.out
+        game_fsm.btn_p1_right = edge2.out
+        game_fsm.btn_p2_left  = edge3.out
+        game_fsm.btn_p2_right = edge4.out
+
+        // ── Wire Datapath → Display ───────────────────────────────
+        display.pixel_address = driver.pixel_address
+        display.p1_board      = dp.p1_board_out
+        display.p2_board      = dp.p2_board_out
+        display.curr_col      = dp.curr_column_out
+
+        // ── Wire Display → Driver ─────────────────────────────────
+        driver.color  = display.color
+        driver.update = 1
+        driver.clear  = 0
+        data          = driver.data
     }
 }

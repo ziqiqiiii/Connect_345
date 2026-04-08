@@ -1,0 +1,126 @@
+module game_display (
+    input pixel_address[7],   // 0-89 from ws2812b_driver
+    input p1_board[32],
+    input p2_board[32],
+    input curr_col[32],
+    output color[24]
+) {
+    const RED    = 24h00FF00
+    const YELLOW = 24h00FF05
+    const WHITE  = 24hFFFFFF
+    const OFF    = 24h000000
+
+    always {
+        case (pixel_address) {
+
+            // ── Cursor row (LEDs 0-14) left→right ────────────────
+            0:  color = (curr_col == 0) ? WHITE : OFF
+            1:  color = (curr_col == 0) ? WHITE : OFF
+            2:  color = (curr_col == 0) ? WHITE : OFF
+            3:  color = (curr_col == 1) ? WHITE : OFF
+            4:  color = (curr_col == 1) ? WHITE : OFF
+            5:  color = (curr_col == 1) ? WHITE : OFF
+            6:  color = (curr_col == 2) ? WHITE : OFF
+            7:  color = (curr_col == 2) ? WHITE : OFF
+            8:  color = (curr_col == 2) ? WHITE : OFF
+            9:  color = (curr_col == 3) ? WHITE : OFF
+            10: color = (curr_col == 3) ? WHITE : OFF
+            11: color = (curr_col == 3) ? WHITE : OFF
+            12: color = (curr_col == 4) ? WHITE : OFF
+            13: color = (curr_col == 4) ? WHITE : OFF
+            14: color = (curr_col == 4) ? WHITE : OFF
+
+            // ── Row 0 bottom (LEDs 15-29) right→left ─────────────
+            // col4→bit24, col3→bit18, col2→bit12, col1→bit6, col0→bit0
+            15: color = p1_board[24] ? RED : (p2_board[24] ? YELLOW : OFF)
+            16: color = p1_board[24] ? RED : (p2_board[24] ? YELLOW : OFF)
+            17: color = p1_board[24] ? RED : (p2_board[24] ? YELLOW : OFF)
+            18: color = p1_board[18] ? RED : (p2_board[18] ? YELLOW : OFF)
+            19: color = p1_board[18] ? RED : (p2_board[18] ? YELLOW : OFF)
+            20: color = p1_board[18] ? RED : (p2_board[18] ? YELLOW : OFF)
+            21: color = p1_board[12] ? RED : (p2_board[12] ? YELLOW : OFF)
+            22: color = p1_board[12] ? RED : (p2_board[12] ? YELLOW : OFF)
+            23: color = p1_board[12] ? RED : (p2_board[12] ? YELLOW : OFF)
+            24: color = p1_board[6]  ? RED : (p2_board[6]  ? YELLOW : OFF)
+            25: color = p1_board[6]  ? RED : (p2_board[6]  ? YELLOW : OFF)
+            26: color = p1_board[6]  ? RED : (p2_board[6]  ? YELLOW : OFF)
+            27: color = p1_board[0]  ? RED : (p2_board[0]  ? YELLOW : OFF)
+            28: color = p1_board[0]  ? RED : (p2_board[0]  ? YELLOW : OFF)
+            29: color = p1_board[0]  ? RED : (p2_board[0]  ? YELLOW : OFF)
+
+            // ── Row 1 (LEDs 30-44) left→right ────────────────────
+            // col0→bit1, col1→bit7, col2→bit13, col3→bit19, col4→bit25
+            30: color = p1_board[1]  ? RED : (p2_board[1]  ? YELLOW : OFF)
+            31: color = p1_board[1]  ? RED : (p2_board[1]  ? YELLOW : OFF)
+            32: color = p1_board[1]  ? RED : (p2_board[1]  ? YELLOW : OFF)
+            33: color = p1_board[7]  ? RED : (p2_board[7]  ? YELLOW : OFF)
+            34: color = p1_board[7]  ? RED : (p2_board[7]  ? YELLOW : OFF)
+            35: color = p1_board[7]  ? RED : (p2_board[7]  ? YELLOW : OFF)
+            36: color = p1_board[13] ? RED : (p2_board[13] ? YELLOW : OFF)
+            37: color = p1_board[13] ? RED : (p2_board[13] ? YELLOW : OFF)
+            38: color = p1_board[13] ? RED : (p2_board[13] ? YELLOW : OFF)
+            39: color = p1_board[19] ? RED : (p2_board[19] ? YELLOW : OFF)
+            40: color = p1_board[19] ? RED : (p2_board[19] ? YELLOW : OFF)
+            41: color = p1_board[19] ? RED : (p2_board[19] ? YELLOW : OFF)
+            42: color = p1_board[25] ? RED : (p2_board[25] ? YELLOW : OFF)
+            43: color = p1_board[25] ? RED : (p2_board[25] ? YELLOW : OFF)
+            44: color = p1_board[25] ? RED : (p2_board[25] ? YELLOW : OFF)
+
+            // ── Row 2 (LEDs 45-59) right→left ────────────────────
+            // col4→bit26, col3→bit20, col2→bit14, col1→bit8, col0→bit2
+            45: color = p1_board[26] ? RED : (p2_board[26] ? YELLOW : OFF)
+            46: color = p1_board[26] ? RED : (p2_board[26] ? YELLOW : OFF)
+            47: color = p1_board[26] ? RED : (p2_board[26] ? YELLOW : OFF)
+            48: color = p1_board[20] ? RED : (p2_board[20] ? YELLOW : OFF)
+            49: color = p1_board[20] ? RED : (p2_board[20] ? YELLOW : OFF)
+            50: color = p1_board[20] ? RED : (p2_board[20] ? YELLOW : OFF)
+            51: color = p1_board[14] ? RED : (p2_board[14] ? YELLOW : OFF)
+            52: color = p1_board[14] ? RED : (p2_board[14] ? YELLOW : OFF)
+            53: color = p1_board[14] ? RED : (p2_board[14] ? YELLOW : OFF)
+            54: color = p1_board[8]  ? RED : (p2_board[8]  ? YELLOW : OFF)
+            55: color = p1_board[8]  ? RED : (p2_board[8]  ? YELLOW : OFF)
+            56: color = p1_board[8]  ? RED : (p2_board[8]  ? YELLOW : OFF)
+            57: color = p1_board[2]  ? RED : (p2_board[2]  ? YELLOW : OFF)
+            58: color = p1_board[2]  ? RED : (p2_board[2]  ? YELLOW : OFF)
+            59: color = p1_board[2]  ? RED : (p2_board[2]  ? YELLOW : OFF)
+
+            // ── Row 3 (LEDs 60-74) left→right ────────────────────
+            // col0→bit3, col1→bit9, col2→bit15, col3→bit21, col4→bit27
+            60: color = p1_board[3]  ? RED : (p2_board[3]  ? YELLOW : OFF)
+            61: color = p1_board[3]  ? RED : (p2_board[3]  ? YELLOW : OFF)
+            62: color = p1_board[3]  ? RED : (p2_board[3]  ? YELLOW : OFF)
+            63: color = p1_board[9]  ? RED : (p2_board[9]  ? YELLOW : OFF)
+            64: color = p1_board[9]  ? RED : (p2_board[9]  ? YELLOW : OFF)
+            65: color = p1_board[9]  ? RED : (p2_board[9]  ? YELLOW : OFF)
+            66: color = p1_board[15] ? RED : (p2_board[15] ? YELLOW : OFF)
+            67: color = p1_board[15] ? RED : (p2_board[15] ? YELLOW : OFF)
+            68: color = p1_board[15] ? RED : (p2_board[15] ? YELLOW : OFF)
+            69: color = p1_board[21] ? RED : (p2_board[21] ? YELLOW : OFF)
+            70: color = p1_board[21] ? RED : (p2_board[21] ? YELLOW : OFF)
+            71: color = p1_board[21] ? RED : (p2_board[21] ? YELLOW : OFF)
+            72: color = p1_board[27] ? RED : (p2_board[27] ? YELLOW : OFF)
+            73: color = p1_board[27] ? RED : (p2_board[27] ? YELLOW : OFF)
+            74: color = p1_board[27] ? RED : (p2_board[27] ? YELLOW : OFF)
+
+            // ── Row 4 top (LEDs 75-89) right→left ────────────────
+            // col4→bit28, col3→bit22, col2→bit16, col1→bit10, col0→bit4
+            75: color = p1_board[28] ? RED : (p2_board[28] ? YELLOW : OFF)
+            76: color = p1_board[28] ? RED : (p2_board[28] ? YELLOW : OFF)
+            77: color = p1_board[28] ? RED : (p2_board[28] ? YELLOW : OFF)
+            78: color = p1_board[22] ? RED : (p2_board[22] ? YELLOW : OFF)
+            79: color = p1_board[22] ? RED : (p2_board[22] ? YELLOW : OFF)
+            80: color = p1_board[22] ? RED : (p2_board[22] ? YELLOW : OFF)
+            81: color = p1_board[16] ? RED : (p2_board[16] ? YELLOW : OFF)
+            82: color = p1_board[16] ? RED : (p2_board[16] ? YELLOW : OFF)
+            83: color = p1_board[16] ? RED : (p2_board[16] ? YELLOW : OFF)
+            84: color = p1_board[10] ? RED : (p2_board[10] ? YELLOW : OFF)
+            85: color = p1_board[10] ? RED : (p2_board[10] ? YELLOW : OFF)
+            86: color = p1_board[10] ? RED : (p2_board[10] ? YELLOW : OFF)
+            87: color = p1_board[4]  ? RED : (p2_board[4]  ? YELLOW : OFF)
+            88: color = p1_board[4]  ? RED : (p2_board[4]  ? YELLOW : OFF)
+            89: color = p1_board[4]  ? RED : (p2_board[4]  ? YELLOW : OFF)
+
+            default: color = OFF
+        }
+    }
+}
