@@ -48,8 +48,8 @@ module fsm (
         MOVE_RIGHT_INC,
         MOVE_RIGHT_WRAP,
         VALIDATE_COL,
-        COMPUTE_BIT_0,
-        COMPUTE_BIT_1,
+        CALC_COL_OFFSET,
+        CALC_ROW_OFFSET,
         COMPUTE_BITMASK,
         UPDATE_CURR_BOARD,
         UPDATE_MAIN_BOARD,
@@ -187,19 +187,19 @@ module fsm (
                 if (rd2 == 5) {
                     state.d = States.IDLE
                 } else {
-                    state.d = States.COMPUTE_BIT_0
+                    state.d = States.CALC_COL_OFFSET
                 }
 
-            States.COMPUTE_BIT_0:
-                ra1   = 4d3
+            States.CALC_COL_OFFSET:
+                ra1   = 4d3             // current col
                 asel  = 2b00
-                bsel  = 3b100
+                bsel  = 3b100           // const 5
                 alufn = MUL
                 wa    = 4d7
                 we    = 1
-                state.d = States.COMPUTE_BIT_1
+                state.d = States.CALC_ROW_OFFSET
 
-            States.COMPUTE_BIT_1:
+            States.CALC_ROW_OFFSET:
                 case (curr_col) {
                     4d0: ra1 = 4d8
                     4d1: ra1 = 4d9
