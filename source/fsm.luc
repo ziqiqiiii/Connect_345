@@ -39,18 +39,7 @@ module fsm (
 
     // ── State enum ────────────────────────────────────────────────────────────
     enum States {
-        INIT_R0,
-        INIT_R1,
-        INIT_R2,
-        INIT_R3,
-        INIT_R4,
-        INIT_R5,
-        INIT_R6,
-        INIT_R8,
-        INIT_R9,
-        INIT_R10,
-        INIT_R11,
-        INIT_R12,
+        INIT,
         IDLE,
         MOVE_LEFT_CHECK,
         MOVE_LEFT_DEC,
@@ -81,7 +70,8 @@ module fsm (
     // ── State register ────────────────────────────────────────────────────────
     .clk(clk) {
         .rst(rst) {
-            dff state[$width(States)](#INIT(States.INIT_R0))
+            dff state[$width(States)](#INIT(States.INIT))
+            dff init_counter[3](#INIT(0))
         }
     }
 
@@ -104,78 +94,16 @@ module fsm (
             // wdsel=b10 writes const 0 to each register, bypassing ALU
             // ══════════════════════════════════════════════════════════════════
 
-            States.INIT_R0:
-                wa = 4d0
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R1
+            States.INIT:
+                wa = init_counter;
+                wdsel = 2b10;
+                we = 1;
 
-            States.INIT_R1:
-                wa = 4d1
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R2
-
-            States.INIT_R2:
-                wa = 4d2
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R3
-
-            States.INIT_R3:
-                wa = 4d3
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R4
-
-            States.INIT_R4:
-                wa = 4d4
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R5
-
-            States.INIT_R5:
-                wa = 4d5
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R6
-
-            States.INIT_R6:
-                wa = 4d6
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R8
-
-            States.INIT_R8:
-                wa = 4d8
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R9
-
-            States.INIT_R9:
-                wa = 4d9
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R10
-
-            States.INIT_R10:
-                wa = 4d10
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R11
-
-            States.INIT_R11:
-                wa = 4d11
-                wdsel = 2b10
-                we = 1
-                state.d = States.INIT_R12
-
-            States.INIT_R12:
-                wa = 4d12
-                wdsel = 2b10
-                we = 1
-                state.d = States.IDLE
-
+                if (init_counter == 12) {
+                    state.d = IDLE;
+                } else {
+                    init_counter.d = init_counter + 1;
+                }
             // ══════════════════════════════════════════════════════════════════
             // PHASE 1 — IDLE
             // ══════════════════════════════════════════════════════════════════
@@ -431,7 +359,7 @@ module fsm (
 
             States.RESTART_WAIT:
                 if (!btn_p1_left & !btn_p1_right & !btn_p2_left & !btn_p2_right & !btn_drop) {
-                    state.d = States.INIT_R0
+                    state.d = States.INIT
                 }
         }
     }
