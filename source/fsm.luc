@@ -95,14 +95,14 @@ module fsm (
             // ══════════════════════════════════════════════════════════════════
 
             States.INIT:
-                wa = init_counter;
+                wa = init_counter.q
                 wdsel = 2b10;
                 we = 1;
 
-                if (init_counter == 12) {
-                    state.d = IDLE;
+                if (init_counter.q == 12) {
+                    state.d = States.IDLE
                 } else {
-                    init_counter.d = init_counter + 1;
+                    init_counter.d = init_counter.q + 1;
                 }
             // ══════════════════════════════════════════════════════════════════
             // PHASE 1 — IDLE
