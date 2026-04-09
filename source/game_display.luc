@@ -20,7 +20,7 @@ module game_display (
     //   Cells 20-24 = board row 1 (pixels 60-74)
     //   Cells 25-29 = board row 0 (pixels 75-89)
     // Written high-to-low so $reverse gives pixel 0→cell 0, pixel 3→cell 1, etc.
-    const CELL = $reverse({
+    const CELL = {
         5d29,5d29,5d29, 5d28,5d28,5d28, 5d27,5d27,5d27,
         5d26,5d26,5d26, 5d25,5d25,5d25, 5d24,5d24,5d24,
         5d23,5d23,5d23, 5d22,5d22,5d22, 5d21,5d21,5d21,
@@ -31,7 +31,7 @@ module game_display (
         5d8, 5d8, 5d8,  5d7, 5d7, 5d7,  5d6, 5d6, 5d6,
         5d5, 5d5, 5d5,  5d4, 5d4, 5d4,  5d3, 5d3, 5d3,
         5d2, 5d2, 5d2,  5d1, 5d1, 5d1,  5d0, 5d0, 5d0
-    })
+    }
 
     sig cell[5]
 

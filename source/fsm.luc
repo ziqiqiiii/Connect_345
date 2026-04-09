@@ -79,7 +79,7 @@ module fsm (
         .rst(rst) {
             dff state[$width(States)](#INIT(States.INIT))
             dff init_counter[4](#INIT(0))
-            dff slow_ctr[26](#INIT(0))
+            dff slow_ctr[20](#INIT(0))
             dff latches[5](#INIT(0))  // [0]=p1l [1]=p1r [2]=p2l [3]=p2r [4]=drop
         }
     }
