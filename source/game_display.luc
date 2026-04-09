@@ -36,25 +36,6 @@ module game_display (
     sig cell[5]
 
     always {
-<<<<<<< Updated upstream
-        case (pixel_address) {
-            // ── Cursor row (LEDs 0-14) left→right ─────────────────
-            0:  color = (curr_col == 0) ? (curr_player ? RED : YELLOW) : OFF
-            1:  color = (curr_col == 0) ? (curr_player ? RED : YELLOW) : OFF
-            2:  color = (curr_col == 0) ? (curr_player ? RED : YELLOW) : OFF
-            3:  color = (curr_col == 1) ? (curr_player ? RED : YELLOW) : OFF
-            4:  color = (curr_col == 1) ? (curr_player ? RED : YELLOW) : OFF
-            5:  color = (curr_col == 1) ? (curr_player ? RED : YELLOW) : OFF
-            6:  color = (curr_col == 2) ? (curr_player ? RED : YELLOW) : OFF
-            7:  color = (curr_col == 2) ? (curr_player ? RED : YELLOW) : OFF
-            8:  color = (curr_col == 2) ? (curr_player ? RED : YELLOW) : OFF
-            9:  color = (curr_col == 3) ? (curr_player ? RED : YELLOW) : OFF
-            10:  color = (curr_col == 3) ? (curr_player ? RED : YELLOW) : OFF
-            11:  color = (curr_col == 3) ? (curr_player ? RED : YELLOW) : OFF
-            12:  color = (curr_col == 4) ? (curr_player ? RED : YELLOW) : OFF
-            13:  color = (curr_col == 4) ? (curr_player ? RED : YELLOW) : OFF
-            14:  color = (curr_col == 4) ? (curr_player ? RED : YELLOW) : OFF
-=======
         cell = CELL[pixel_address]
 
         case (cell) {
@@ -65,14 +46,13 @@ module game_display (
             2:  color = (curr_col == 2) ? (curr_player == 0 ? RED : YELLOW) : OFF
             3:  color = (curr_col == 3) ? (curr_player == 0 ? RED : YELLOW) : OFF
             4:  color = (curr_col == 4) ? (curr_player == 0 ? RED : YELLOW) : OFF
->>>>>>> Stashed changes
 
             // ── Board row 4 TOP (cells 5-9): col0→bit4, col1→bit10, … ────────
-            5:  color = p1_board[4]  ? RED : (p2_board[4]  ? YELLOW : OFF)
-            6:  color = p1_board[10] ? RED : (p2_board[10] ? YELLOW : OFF)
+            5:  color = p1_board[28]  ? RED : (p2_board[28]  ? YELLOW : OFF)
+            6:  color = p1_board[22] ? RED : (p2_board[22] ? YELLOW : OFF)
             7:  color = p1_board[16] ? RED : (p2_board[16] ? YELLOW : OFF)
-            8:  color = p1_board[22] ? RED : (p2_board[22] ? YELLOW : OFF)
-            9:  color = p1_board[28] ? RED : (p2_board[28] ? YELLOW : OFF)
+            8:  color = p1_board[10] ? RED : (p2_board[10] ? YELLOW : OFF)
+            9:  color = p1_board[4] ? RED : (p2_board[4] ? YELLOW : OFF)
 
             // ── Board row 3 (cells 10-14): col0→bit3, col1→bit9, … ──────────
             10: color = p1_board[3]  ? RED : (p2_board[3]  ? YELLOW : OFF)
@@ -82,11 +62,11 @@ module game_display (
             14: color = p1_board[27] ? RED : (p2_board[27] ? YELLOW : OFF)
 
             // ── Board row 2 (cells 15-19): col0→bit2, col1→bit8, … ──────────
-            15: color = p1_board[2]  ? RED : (p2_board[2]  ? YELLOW : OFF)
-            16: color = p1_board[8]  ? RED : (p2_board[8]  ? YELLOW : OFF)
+            15: color = p1_board[26]  ? RED : (p2_board[26]  ? YELLOW : OFF)
+            16: color = p1_board[20]  ? RED : (p2_board[20]  ? YELLOW : OFF)
             17: color = p1_board[14] ? RED : (p2_board[14] ? YELLOW : OFF)
-            18: color = p1_board[20] ? RED : (p2_board[20] ? YELLOW : OFF)
-            19: color = p1_board[26] ? RED : (p2_board[26] ? YELLOW : OFF)
+            18: color = p1_board[8] ? RED : (p2_board[8] ? YELLOW : OFF)
+            19: color = p1_board[2] ? RED : (p2_board[2] ? YELLOW : OFF)
 
             // ── Board row 1 (cells 20-24): col0→bit1, col1→bit7, … ──────────
             20: color = p1_board[1]  ? RED : (p2_board[1]  ? YELLOW : OFF)
@@ -96,11 +76,11 @@ module game_display (
             24: color = p1_board[25] ? RED : (p2_board[25] ? YELLOW : OFF)
 
             // ── Board row 0 BOTTOM (cells 25-29): col0→bit0, col1→bit6, … ───
-            25: color = p1_board[0]  ? RED : (p2_board[0]  ? YELLOW : OFF)
-            26: color = p1_board[6]  ? RED : (p2_board[6]  ? YELLOW : OFF)
+            25: color = p1_board[24]  ? RED : (p2_board[24]  ? YELLOW : OFF)
+            26: color = p1_board[18]  ? RED : (p2_board[18]  ? YELLOW : OFF)
             27: color = p1_board[12] ? RED : (p2_board[12] ? YELLOW : OFF)
-            28: color = p1_board[18] ? RED : (p2_board[18] ? YELLOW : OFF)
-            29: color = p1_board[24] ? RED : (p2_board[24] ? YELLOW : OFF)
+            28: color = p1_board[6] ? RED : (p2_board[6] ? YELLOW : OFF)
+            29: color = p1_board[0] ? RED : (p2_board[0] ? YELLOW : OFF)
 
             default: color = OFF
         }
