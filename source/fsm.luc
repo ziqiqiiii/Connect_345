@@ -46,12 +46,15 @@ module fsm (
         INIT,
         IDLE,
         MOVE_LEFT_CHECK,
+        MOVE_LEFT_BRANCH,
         MOVE_LEFT_DEC,
         MOVE_LEFT_WRAP,
         MOVE_RIGHT_CHECK,
+        MOVE_RIGHT_BRANCH,
         MOVE_RIGHT_INC,
         MOVE_RIGHT_WRAP,
         VALIDATE_COL,
+        VALIDATE_COL_BRANCH,
         CALC_COL_OFFSET,
         CALC_ROW_OFFSET,
         COMPUTE_BITMASK,
@@ -169,8 +172,17 @@ module fsm (
                 // ══════════════════════════════════════════════════════════════
 
                 States.MOVE_LEFT_CHECK:
-                    ra2 = 4d3
-                    if (rd2 == 0) {
+                    ra1   = 4d3
+                    asel  = 2b00
+                    bsel  = 3b001
+                    alufn = CMPEQ
+                    wa    = 4d7
+                    we    = 1
+                    state.d = States.MOVE_LEFT_BRANCH
+
+                States.MOVE_LEFT_BRANCH:
+                    ra2 = 4d7
+                    if (rd2 == 1) {
                         state.d = States.MOVE_LEFT_WRAP
                     } else {
                         state.d = States.MOVE_LEFT_DEC
@@ -194,8 +206,17 @@ module fsm (
                     state.d = States.IDLE
 
                 States.MOVE_RIGHT_CHECK:
-                    ra2 = 4d3
-                    if (rd2 == 4) {
+                    ra2   = 4d3
+                    asel  = 2b11
+                    bsel  = 3b000
+                    alufn = CMPEQ
+                    wa    = 4d7
+                    we    = 1
+                    state.d = States.MOVE_RIGHT_BRANCH
+
+                States.MOVE_RIGHT_BRANCH:
+                    ra2 = 4d7
+                    if (rd2 == 1) {
                         state.d = States.MOVE_RIGHT_WRAP
                     } else {
                         state.d = States.MOVE_RIGHT_INC
@@ -222,14 +243,23 @@ module fsm (
 
                 States.VALIDATE_COL:
                     case (curr_col) {
-                        4d0: ra2 = 4d8
-                        4d1: ra2 = 4d9
-                        4d2: ra2 = 4d10
-                        4d3: ra2 = 4d11
-                        4d4: ra2 = 4d12
-                        default: ra2 = 4d8
+                        4d0: ra1 = 4d8
+                        4d1: ra1 = 4d9
+                        4d2: ra1 = 4d10
+                        4d3: ra1 = 4d11
+                        4d4: ra1 = 4d12
+                        default: ra1 = 4d8
                     }
-                    if (rd2 == 5) {
+                    asel  = 2b00
+                    bsel  = 3b011
+                    alufn = CMPEQ
+                    wa    = 4d7
+                    we    = 1
+                    state.d = States.VALIDATE_COL_BRANCH
+
+                States.VALIDATE_COL_BRANCH:
+                    ra2 = 4d7
+                    if (rd2 == 1) {
                         state.d = States.IDLE
                     } else {
                         state.d = States.CALC_COL_OFFSET

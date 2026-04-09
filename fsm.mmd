@@ -28,8 +28,19 @@ flowchart TD
 
   MOVE_LEFT_CHECK["<b>MOVE_LEFT_CHECK</b>
   ─────────────────
+  ra1: 0d3
+  ra2: --
+  wa: 0d7
+  we: b1
+  alufn: CMPEQ
+  asel: b00
+  bsel: b001
+  wdsel: --"]
+
+  MOVE_LEFT_BRANCH["<b>MOVE_LEFT_BRANCH</b>
+  ─────────────────
   ra1: --
-  ra2: 0d3
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -63,6 +74,17 @@ flowchart TD
   ─────────────────
   ra1: --
   ra2: 0d3
+  wa: 0d7
+  we: b1
+  alufn: CMPEQ
+  asel: b11
+  bsel: b000
+  wdsel: --"]
+
+  MOVE_RIGHT_BRANCH["<b>MOVE_RIGHT_BRANCH</b>
+  ─────────────────
+  ra1: --
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -94,8 +116,19 @@ flowchart TD
 
   VALIDATE_COL["<b>VALIDATE_COL</b>
   ─────────────────
+  ra1: curr_col-dependent
+  ra2: --
+  wa: 0d7
+  we: b1
+  alufn: CMPEQ
+  asel: b00
+  bsel: b011
+  wdsel: --"]
+
+  VALIDATE_COL_BRANCH["<b>VALIDATE_COL_BRANCH</b>
+  ─────────────────
   ra1: --
-  ra2: curr_col-dependent
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -194,7 +227,7 @@ flowchart TD
   BRANCH_MOVE_COUNT["<b>BRANCH_MOVE_COUNT</b>
   ─────────────────
   ra1: --
-  ra2: 7
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -204,19 +237,52 @@ flowchart TD
 
   SWITCH_PLAYER["<b>SWITCH_PLAYER</b>
   ─────────────────
-  ra1: --
-  ra2: 0d2
+  ra1: 0d2
+  ra2: --
   wa: 0d2
   we: b1
-  alufn: SUB
-  asel: b01
-  bsel: b000
+  alufn: XOR
+  asel: b00
+  bsel: b010
   wdsel: --"]
 
   WIN_CHECK["<b>WIN_CHECK</b>
   ─────────────────
   ra1: 0d4
   ra2: 0d5
+  wa: 0d7
+  we: b1
+  alufn: CMPLT
+  asel: b00
+  bsel: b000
+  wdsel: --"]
+
+  WIN_BRANCH_LT["<b>WIN_BRANCH_LT</b>
+  ─────────────────
+  ra1: --
+  ra2: 0d7
+  wa: --
+  we: b0
+  alufn: --
+  asel: --
+  bsel: --
+  wdsel: --"]
+
+  WIN_CHECK_EQ["<b>WIN_CHECK_EQ</b>
+  ─────────────────
+  ra1: 0d4
+  ra2: 0d5
+  wa: 0d7
+  we: b1
+  alufn: CMPEQ
+  asel: b00
+  bsel: b000
+  wdsel: --"]
+
+  WIN_BRANCH_EQ["<b>WIN_BRANCH_EQ</b>
+  ─────────────────
+  ra1: --
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -299,18 +365,21 @@ flowchart TD
   IDLE -->|curr_player == 1 && btn_p2_right| MOVE_RIGHT_CHECK
   IDLE -->|btn_drop| VALIDATE_COL
 
-  MOVE_LEFT_CHECK -->|rd2 == 0| MOVE_LEFT_WRAP
-  MOVE_LEFT_CHECK -->|rd2 != 0| MOVE_LEFT_DEC
+  MOVE_LEFT_CHECK --> MOVE_LEFT_BRANCH
+  MOVE_LEFT_BRANCH -->|rd2 == 1| MOVE_LEFT_WRAP
+  MOVE_LEFT_BRANCH -->|rd2 != 1| MOVE_LEFT_DEC
   MOVE_LEFT_DEC --> IDLE
   MOVE_LEFT_WRAP --> IDLE
 
-  MOVE_RIGHT_CHECK -->|rd2 == 4| MOVE_RIGHT_WRAP
-  MOVE_RIGHT_CHECK -->|rd2 != 4| MOVE_RIGHT_INC
+  MOVE_RIGHT_CHECK --> MOVE_RIGHT_BRANCH
+  MOVE_RIGHT_BRANCH -->|rd2 == 1| MOVE_RIGHT_WRAP
+  MOVE_RIGHT_BRANCH -->|rd2 != 1| MOVE_RIGHT_INC
   MOVE_RIGHT_INC --> IDLE
   MOVE_RIGHT_WRAP --> IDLE
 
-  VALIDATE_COL -->|rd2 == 5| IDLE
-  VALIDATE_COL -->|rd2 != 5| CALC_COL_OFFSET
+  VALIDATE_COL --> VALIDATE_COL_BRANCH
+  VALIDATE_COL_BRANCH -->|rd2 == 1| IDLE
+  VALIDATE_COL_BRANCH -->|rd2 != 1| CALC_COL_OFFSET
 
   CALC_COL_OFFSET --> CALC_ROW_OFFSET
   CALC_ROW_OFFSET --> COMPUTE_BITMASK
@@ -325,9 +394,12 @@ flowchart TD
   BRANCH_MOVE_COUNT -->|rd2 != 25| SWITCH_PLAYER
   SWITCH_PLAYER --> IDLE
 
-  WIN_CHECK -->|rd1 > rd2| P1_WINS
-  WIN_CHECK -->|rd2 > rd1| P2_WINS
-  WIN_CHECK -->|rd1 == rd2| DRAW_0
+  WIN_CHECK --> WIN_BRANCH_LT
+  WIN_BRANCH_LT -->|rd2 == 1| P2_WINS
+  WIN_BRANCH_LT -->|rd2 != 1| WIN_CHECK_EQ
+  WIN_CHECK_EQ --> WIN_BRANCH_EQ
+  WIN_BRANCH_EQ -->|rd2 == 1| DRAW_0
+  WIN_BRANCH_EQ -->|rd2 != 1| P1_WINS
 
   P1_WINS --> GAME_OVER
   P2_WINS --> GAME_OVER
