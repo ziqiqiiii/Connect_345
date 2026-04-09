@@ -20,7 +20,11 @@ module datapath (
     output p1_score_out[32],      // R4 - Player 1's Score
     output p2_score_out[32],       // R5 - Player 2's Score
     output rd1_out[32],
-    output rd2_out[32]
+    output rd2_out[32],
+
+    // -- Debug read port (driven by io_dip, shown on io_led) --
+    input dbg_ra[4],    // debug register address from io_dip[0][3:0]
+    output dbg_rd[32]   // debug register data → io_led[2:1]
 ) {
 
     // ── Sub-module instantiation ─────────────────────────────────────────────
@@ -42,12 +46,14 @@ module datapath (
     always {
 
         // ── Step 1: Read from REGFILE ────────────────────────────────────────
-        regfile.ra1 = ra1
-        regfile.ra2 = ra2
+        regfile.ra1    = ra1
+        regfile.ra2    = ra2
+        regfile.dbg_ra = dbg_ra   // debug port: address from io_dip
         rd1 = regfile.rd1
         rd2 = regfile.rd2
         rd1_out = rd1
         rd2_out = rd2
+        dbg_rd  = regfile.dbg_rd  // debug port: data to io_led
 
         // ── Step 2: ASEL mux (2-bit select) ─────────────────────────────────
         // Input 0: rd1  (from REGFILE)
