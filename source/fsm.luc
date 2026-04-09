@@ -126,6 +126,7 @@ module fsm (
 
                     if (init_counter.q == 12) {
                         state.d = States.IDLE
+                        init_counter.d = 0
                     } else {
                         init_counter.d = init_counter.q + 1
                     }
