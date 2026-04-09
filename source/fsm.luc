@@ -36,6 +36,8 @@ module fsm (
     const ALU_POPCOUNT = 6b000100
     const OR           = 6b011110
     const SHL          = 6b100000
+    const CMPEQ        = 6b110011   
+    const CMPLT        = 6b110101
 
     // ── State enum ────────────────────────────────────────────────────────────
     enum States {
@@ -59,6 +61,9 @@ module fsm (
         BRANCH_MOVE_COUNT,
         SWITCH_PLAYER,
         WIN_CHECK,
+        WIN_BRANCH_LT,
+        WIN_CHECK_EQ,
+        WIN_BRANCH_EQ,
         P1_WINS,
         P2_WINS,
         DRAW_0,
@@ -314,14 +319,39 @@ module fsm (
             // ══════════════════════════════════════════════════════════════════
 
             States.WIN_CHECK:
-                ra1 = 4d4
-                ra2 = 4d5
-                if (rd1 > rd2) {
-                    state.d = States.P1_WINS
-                } else if (rd2 > rd1) {
+                ra1   = 4d4 // P1 score
+                ra2   = 4d5 // P2 score
+                asel  = 2b00
+                bsel  = 3b000
+                alufn = CMPLT
+                wa    = 4d7
+                we    = 1
+                state.d = States.WIN_BRANCH_LT
+            
+            States.WIN_BRANCH_LT:
+                ra2 = 4d7
+                if (rd2 == 1) {
                     state.d = States.P2_WINS
                 } else {
+                    state.d = States.WIN_CHECK_EQ
+                }
+            
+            States.WIN_CHECK_EQ:
+                ra1   = 4d4
+                ra2   = 4d5
+                asel  = 2b00
+                bsel  = 3b000
+                alufn = CMPEQ
+                wa    = 4d7
+                we    = 1
+                state.d = States.WIN_BRANCH_EQ
+            
+            States.WIN_BRANCH_EQ:
+                ra2 = 4d7
+                if (rd2 == 1) {
                     state.d = States.DRAW_0
+                } else {
+                    state.d = States.P1_WINS
                 }
 
             // ══════════════════════════════════════════════════════════════════
