@@ -13,23 +13,22 @@ module game_display (
 
     always {
         case (pixel_address) {
-
             // ── Cursor row (LEDs 0-14) left→right ─────────────────
-            0:  color = (curr_col == 0) ? WHITE : OFF
-            1:  color = (curr_col == 0) ? WHITE : OFF
-            2:  color = (curr_col == 0) ? WHITE : OFF
-            3:  color = (curr_col == 1) ? WHITE : OFF
-            4:  color = (curr_col == 1) ? WHITE : OFF
-            5:  color = (curr_col == 1) ? WHITE : OFF
-            6:  color = (curr_col == 2) ? WHITE : OFF
-            7:  color = (curr_col == 2) ? WHITE : OFF
-            8:  color = (curr_col == 2) ? WHITE : OFF
-            9:  color = (curr_col == 3) ? WHITE : OFF
-            10: color = (curr_col == 3) ? WHITE : OFF
-            11: color = (curr_col == 3) ? WHITE : OFF
-            12: color = (curr_col == 4) ? WHITE : OFF
-            13: color = (curr_col == 4) ? WHITE : OFF
-            14: color = (curr_col == 4) ? WHITE : OFF
+            0:  color = (curr_col == 0) ? (curr_player ? RED : YELLOW) : OFF
+            1:  color = (curr_col == 0) ? (curr_player ? RED : YELLOW) : OFF
+            2:  color = (curr_col == 0) ? (curr_player ? RED : YELLOW) : OFF
+            3:  color = (curr_col == 1) ? (curr_player ? RED : YELLOW) : OFF
+            4:  color = (curr_col == 1) ? (curr_player ? RED : YELLOW) : OFF
+            5:  color = (curr_col == 1) ? (curr_player ? RED : YELLOW) : OFF
+            6:  color = (curr_col == 2) ? (curr_player ? RED : YELLOW) : OFF
+            7:  color = (curr_col == 2) ? (curr_player ? RED : YELLOW) : OFF
+            8:  color = (curr_col == 2) ? (curr_player ? RED : YELLOW) : OFF
+            9:  color = (curr_col == 3) ? (curr_player ? RED : YELLOW) : OFF
+            10:  color = (curr_col == 3) ? (curr_player ? RED : YELLOW) : OFF
+            11:  color = (curr_col == 3) ? (curr_player ? RED : YELLOW) : OFF
+            12:  color = (curr_col == 4) ? (curr_player ? RED : YELLOW) : OFF
+            13:  color = (curr_col == 4) ? (curr_player ? RED : YELLOW) : OFF
+            14:  color = (curr_col == 4) ? (curr_player ? RED : YELLOW) : OFF
 
             // ── Row 4 TOP (LEDs 15-29) left→right ─────────────────
             // col0→bit4, col1→bit10, col2→bit16, col3→bit22, col4→bit28

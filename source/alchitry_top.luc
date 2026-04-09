@@ -99,6 +99,7 @@ module alchitry_top (
         display.p1_board      = dp.p1_board_out
         display.p2_board      = dp.p2_board_out
         display.curr_col      = dp.curr_column_out
+        display.curr_player   = dp.curr_player_out
 
         // ── Wire Display → Driver ─────────────────────────────────
         driver.color  = display.color
