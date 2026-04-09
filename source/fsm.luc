@@ -25,7 +25,8 @@ module fsm (
     output alufn[6],        // ALU function select
     output asel[2],         // ASEL mux select
     output bsel[3],         // BSEL mux select
-    output wdsel[2]         // WDSEL mux select
+    output wdsel[2],         // WDSEL mux select
+    output fsm_state[5]     // debug: current state index
 ) {
 
     // ── ALUFN constants (verified from alu.luc) ───────────────────────────────
@@ -81,6 +82,7 @@ module fsm (
     }
 
     always {
+        fsm_state = state.q
         // ── Safe defaults ─────────────────────────────────────────────────────
         ra1     = 4d0
         ra2     = 4d0
