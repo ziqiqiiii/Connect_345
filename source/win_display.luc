@@ -1,0 +1,229 @@
+/* win_display.luc — Win animation for Alchitry Connect-Four game
+ *
+ * Adapted from led_testing/source/explosion_mode.luc.
+ * Plays the expanding explosion animation (dot → diamond → ring),
+ * then shows the winner display:
+ *   winner == 2b00 → "1!" in RED   (P1 wins)
+ *   winner == 2b01 → "2!" in YELLOW (P2 wins)
+ *   winner == 2b10 → all LEDs alternate RED/YELLOW (draw)
+ *
+ * Unlike explosion_mode, this module does NOT own a ws2812b_driver.
+ * It receives pixel_address from the shared driver in alchitry_top,
+ * outputs a color per pixel, and advances animation state on frame_done
+ * pulses (driver.done from alchitry_top).
+ *
+ * trigger: a 1-cycle rising-edge pulse that starts (or restarts) the animation.
+ */
+module win_display (
+    input clk,
+    input rst,
+    input pixel_address[7],   // 0-89 from shared ws2812b_driver
+    input winner[2],          // 0=P1 (red "1!"), 1=P2 (yellow "2!"), 2=draw
+    input trigger,            // rising-edge pulse: start animation
+    input frame_done,         // = driver.done pulse from alchitry_top
+    output color[24]          // 24-bit BRG color back to shared driver
+) {
+    // ── BOX_LOOKUP ──────────────────────────────────────────────────────────
+    // 90-entry ROM: physical LED address → logical box index (0-29).
+    // Boxes 0-24 = 5×5 matrix; boxes 25-29 = top cursor row.
+    const BOX_LOOKUP = $reverse({
+        5d25, 5d25, 5d25,  // 0-2   box25 top col0
+        5d26, 5d26, 5d26,  // 3-5   box26 top col1
+        5d27, 5d27, 5d27,  // 6-8   box27 top col2
+        5d28, 5d28, 5d28,  // 9-11  box28 top col3
+        5d29, 5d29, 5d29,  // 12-14 box29 top col4
+        5d4,  5d4,  5d4,   // 15-17 box4  mrow0 col4
+        5d3,  5d3,  5d3,   // 18-20 box3  mrow0 col3
+        5d2,  5d2,  5d2,   // 21-23 box2  mrow0 col2
+        5d1,  5d1,  5d1,   // 24-26 box1  mrow0 col1
+        5d0,  5d0,  5d0,   // 27-29 box0  mrow0 col0
+        5d5,  5d5,  5d5,   // 30-32 box5  mrow1 col0
+        5d6,  5d6,  5d6,   // 33-35 box6  mrow1 col1
+        5d7,  5d7,  5d7,   // 36-38 box7  mrow1 col2
+        5d8,  5d8,  5d8,   // 39-41 box8  mrow1 col3
+        5d9,  5d9,  5d9,   // 42-44 box9  mrow1 col4
+        5d14, 5d14, 5d14,  // 45-47 box14 mrow2 col4
+        5d13, 5d13, 5d13,  // 48-50 box13 mrow2 col3
+        5d12, 5d12, 5d12,  // 51-53 box12 mrow2 col2  ← CENTER
+        5d11, 5d11, 5d11,  // 54-56 box11 mrow2 col1
+        5d10, 5d10, 5d10,  // 57-59 box10 mrow2 col0
+        5d15, 5d15, 5d15,  // 60-62 box15 mrow3 col0
+        5d16, 5d16, 5d16,  // 63-65 box16 mrow3 col1
+        5d17, 5d17, 5d17,  // 66-68 box17 mrow3 col2
+        5d18, 5d18, 5d18,  // 69-71 box18 mrow3 col3
+        5d19, 5d19, 5d19,  // 72-74 box19 mrow3 col4
+        5d24, 5d24, 5d24,  // 75-77 box24 mrow4 col4
+        5d23, 5d23, 5d23,  // 78-80 box23 mrow4 col3
+        5d22, 5d22, 5d22,  // 81-83 box22 mrow4 col2
+        5d21, 5d21, 5d21,  // 84-86 box21 mrow4 col1
+        5d20, 5d20, 5d20   // 87-89 box20 mrow4 col0
+    })
+
+    // ── MATRIX PATTERN ROMs (25 entries, row-major: [0]=row0col0 … [24]=row4col4) ─
+
+    // FRAME1: single center dot (box12 = mrow2,col2)
+    const FRAME1 = $reverse({
+        1b0, 1b0, 1b0, 1b0, 1b0,
+        1b0, 1b0, 1b0, 1b0, 1b0,
+        1b0, 1b0, 1b1, 1b0, 1b0,  // center
+        1b0, 1b0, 1b0, 1b0, 1b0,
+        1b0, 1b0, 1b0, 1b0, 1b0
+    })
+
+    // FRAME2: diamond (boxes 6,8,16,18)
+    const FRAME2 = $reverse({
+        1b0, 1b0, 1b0, 1b0, 1b0,
+        1b0, 1b1, 1b0, 1b1, 1b0,  // col1, col3
+        1b0, 1b0, 1b0, 1b0, 1b0,
+        1b0, 1b1, 1b0, 1b1, 1b0,  // col1, col3
+        1b0, 1b0, 1b0, 1b0, 1b0
+    })
+
+    // FRAME3: outer ring (col2 off for dramatic gap)
+    const FRAME3 = $reverse({
+        1b1, 1b1, 1b0, 1b1, 1b1,
+        1b1, 1b0, 1b0, 1b0, 1b1,
+        1b0, 1b0, 1b0, 1b0, 1b0,
+        1b1, 1b0, 1b0, 1b0, 1b1,
+        1b1, 1b1, 1b0, 1b1, 1b1
+    })
+
+    // PATTERN_1: "1!" in cols 0-2, gap col3, "!" in col4
+    const PATTERN_1 = $reverse({
+        1b1, 1b1, 1b0, 1b0, 1b1,  // row0 cols 0,1,4
+        1b0, 1b1, 1b0, 1b0, 1b1,  // row1 cols 1,4
+        1b0, 1b1, 1b0, 1b0, 1b1,  // row2 cols 1,4
+        1b0, 1b1, 1b0, 1b0, 1b0,  // row3 col 1
+        1b1, 1b1, 1b1, 1b0, 1b1   // row4 cols 0,1,2,4
+    })
+
+    // PATTERN_2: "2!" in cols 0-2, gap col3, "!" in col4
+    const PATTERN_2 = $reverse({
+        1b1, 1b1, 1b1, 1b0, 1b1,  // row0 cols 0,1,2,4
+        1b0, 1b0, 1b1, 1b0, 1b1,  // row1 cols 2,4
+        1b1, 1b1, 1b1, 1b0, 1b1,  // row2 cols 0,1,2,4
+        1b1, 1b0, 1b0, 1b0, 1b0,  // row3 col 0
+        1b1, 1b1, 1b1, 1b0, 1b1   // row4 cols 0,1,2,4
+    })
+
+    // TOP ROW: alternating patterns (boxes 25-29)
+    const TOP_A = $reverse({1b0, 1b1, 1b0, 1b1, 1b0})  // [ ][x][ ][x][ ]
+    const TOP_B = $reverse({1b1, 1b0, 1b1, 1b0, 1b1})  // [x][ ][x][ ][x]
+
+    // ── HARDWARE ─────────────────────────────────────────────────────────────
+    .clk(clk) {
+        .rst(rst) {
+            dff anim_state[3](#INIT(0))  // 0=IDLE 1=F1 2=F2 3=F3 4=DISPLAY
+            dff frame_ctr[8](#INIT(0))   // overflows (~255 frames) to advance state
+            dff flash_ctr[8](#INIT(0))   // bit[7] toggles "!" flash
+            dff alt_ctr[9](#INIT(0))     // bit[8] toggles top-row pattern
+        }
+    }
+
+    sig box_index[5]
+    sig top_col[3]
+    sig lit
+    sig pattern_bit
+    sig is_bang
+    sig flash_on
+    sig p_color[24]
+
+    always {
+        // DFF hold defaults
+        anim_state.d = anim_state.q
+        frame_ctr.d  = frame_ctr.q
+        flash_ctr.d  = flash_ctr.q
+        alt_ctr.d    = alt_ctr.q
+
+        // Signal defaults
+        color       = 24h000000
+        box_index   = 5d0
+        top_col     = 3d0
+        lit         = 1b0
+        pattern_bit = 1b0
+        is_bang     = 1b0
+        flash_on    = 1b0
+        p_color     = 24h000000
+
+        // ── Advance animation state on each completed frame ───────────────
+        if (frame_done) {
+            alt_ctr.d   = alt_ctr.q + 1
+            flash_ctr.d = flash_ctr.q + 1
+            frame_ctr.d = frame_ctr.q + 1
+
+            if (anim_state.q == 3d1 && &frame_ctr.q) {
+                anim_state.d = 3d2
+                frame_ctr.d  = 8h00
+            } else if (anim_state.q == 3d2 && &frame_ctr.q) {
+                anim_state.d = 3d3
+                frame_ctr.d  = 8h00
+            } else if (anim_state.q == 3d3 && &frame_ctr.q) {
+                anim_state.d = 3d4
+            }
+        }
+
+        // ── trigger: start (or restart) animation from FRAME1 ────────────
+        if (trigger) {
+            anim_state.d = 3d1
+            frame_ctr.d  = 8h00
+        }
+
+        // ── Pick color based on winner ────────────────────────────────────
+        if (winner == 2b00) {
+            p_color = 24h00FF00  // RED   (BRG: B=0, R=0xFF, G=0)
+        } else if (winner == 2b01) {
+            p_color = 24h00FF05  // YELLOW (BRG: B=0, R=0xFF, G=5)
+        } else {
+            p_color = 24hFFFFFF  // WHITE  (draw)
+        }
+
+        // ── Per-pixel color output ────────────────────────────────────────
+        box_index = BOX_LOOKUP[$resize(pixel_address, $clog2($width(BOX_LOOKUP, 0)))]
+        flash_on  = flash_ctr.q[7]
+
+        if (box_index >= 25) {
+            // Top row: always alternating
+            top_col = $resize(box_index - 25, 3)
+            if (alt_ctr.q[8]) {
+                lit = TOP_B[$resize(top_col, $clog2($width(TOP_B, 0)))]
+            } else {
+                lit = TOP_A[$resize(top_col, $clog2($width(TOP_A, 0)))]
+            }
+        } else {
+            // Matrix: depends on animation state
+            if (anim_state.q == 3d1) {
+                lit = FRAME1[$resize(box_index, $clog2($width(FRAME1, 0)))]
+            } else if (anim_state.q == 3d2) {
+                lit = FRAME2[$resize(box_index, $clog2($width(FRAME2, 0)))]
+            } else if (anim_state.q == 3d3) {
+                lit = FRAME3[$resize(box_index, $clog2($width(FRAME3, 0)))]
+            } else if (anim_state.q == 3d4) {
+                if (winner == 2b10) {
+                    // Draw: flash all matrix LEDs alternating RED/YELLOW
+                    lit = 1b1
+                    p_color = flash_on ? 24h00FF00 : 24h00FF05
+                } else {
+                    // Win: show "1!" or "2!" pattern
+                    if (winner == 2b00) {
+                        pattern_bit = PATTERN_1[$resize(box_index, $clog2($width(PATTERN_1, 0)))]
+                    } else {
+                        pattern_bit = PATTERN_2[$resize(box_index, $clog2($width(PATTERN_2, 0)))]
+                    }
+                    // "!" column boxes: 4, 9, 14, 24 — flash them
+                    is_bang = (box_index == 5d4) | (box_index == 5d9) |
+                              (box_index == 5d14) | (box_index == 5d24)
+                    if (is_bang) {
+                        lit = pattern_bit & flash_on
+                    } else {
+                        lit = pattern_bit
+                    }
+                }
+            }
+            // anim_state == IDLE (3d0): lit stays 0
+        }
+
+        if (lit) {
+            color = p_color
+        }
+    }
+}

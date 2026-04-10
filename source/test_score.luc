@@ -16,11 +16,13 @@ testbench test_score {
         // 6: diagonal / (col0r0, col1r1, col2r2)
         c{32h00004081,   32d0,   6b000011, 32d1},
         // 7: triangle board = 19
-        c{32h1F79C610,   32d0,   6b000011, 32d19}
+        c{32h1F79C610,   32d0,   6b000011, 32d19},
+        c{32h0A54A2CA,   32d0,   6b000011, 32d5},
+        c{32h15295515,   32d0,   6b000011, 32d6}
     })
 
     test scoreTest {
-        repeat(i, 8) {
+        repeat(i, 10) {
             alu.a = TEST_CASES_SCORE[i][101:70]
             alu.b = TEST_CASES_SCORE[i][69:38]
             alu.alufn = TEST_CASES_SCORE[i][37:32]

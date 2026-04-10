@@ -26,7 +26,8 @@ module fsm (
     output asel[2],         // ASEL mux select
     output bsel[3],         // BSEL mux select
     output wdsel[2],        // WDSEL mux select
-    output fsm_state[5]     // debug: current state index
+    output fsm_state[5],    // debug: current state index
+    output game_over        // 1 when in any end-game state
 ) {
 
     // ── ALUFN constants (verified from alu.luc) ───────────────────────────────
@@ -100,6 +101,14 @@ module fsm (
         bsel    = 3b000
         wdsel   = 2b00
         state.d = state.q
+
+        // ── game_over: only after win-marker write has committed to regfile ─────
+        // P1_WINS/P2_WINS/DRAW_x execute for one slow_ctr period before
+        // transitioning to GAME_OVER.  The regfile DFF latches 0xF (or 0xFFFF)
+        // at the same clock edge that state.q becomes GAME_OVER, so winner is
+        // already correct the moment game_over first rises.
+        game_over = (state.q == States.GAME_OVER)  |
+                    (state.q == States.RESTART_WAIT)
 
         // ── Always latch buttons every clock (not gated by slow_ctr) ─────────
         // [0]=p1l [1]=p1r [2]=p2l [3]=p2r [4]=drop
