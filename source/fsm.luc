@@ -27,7 +27,8 @@ module fsm (
     output bsel[3],         // BSEL mux select
     output wdsel[2],        // WDSEL mux select
     output fsm_state[5],    // debug: current state index
-    output game_over        // 1 when in any end-game state
+    output game_over,       // 1 when in GAME_OVER or RESTART_WAIT
+    output idle_face        // 1 when in IDLE_FACE (show face animation)
 ) {
 
     // ── ALUFN constants (verified from alu.luc) ───────────────────────────────
@@ -75,13 +76,14 @@ module fsm (
         DRAW_0,
         DRAW_1,
         GAME_OVER,
-        RESTART_WAIT
+        RESTART_WAIT,
+        IDLE_FACE
     }
 
     // ── State register ────────────────────────────────────────────────────────
     .clk(clk) {
         .rst(rst) {
-            dff state[$width(States)](#INIT(States.INIT))
+            dff state[$width(States)](#INIT(States.IDLE_FACE))
             dff init_counter[4](#INIT(0))
             dff slow_ctr[20](#INIT(0))
             dff latches[5](#INIT(0))  // [0]=p1l [1]=p1r [2]=p2l [3]=p2r [4]=drop
@@ -107,8 +109,10 @@ module fsm (
         // transitioning to GAME_OVER.  The regfile DFF latches 0xF (or 0xFFFF)
         // at the same clock edge that state.q becomes GAME_OVER, so winner is
         // already correct the moment game_over first rises.
+        // Stays high through RESTART_WAIT so win_display keeps showing.
         game_over = (state.q == States.GAME_OVER)  |
                     (state.q == States.RESTART_WAIT)
+        idle_face = (state.q == States.IDLE_FACE)
 
         // ── Always latch buttons every clock (not gated by slow_ctr) ─────────
         // [0]=p1l [1]=p1r [2]=p2l [3]=p2r [4]=drop
@@ -462,16 +466,24 @@ module fsm (
                     state.d = States.GAME_OVER
 
                 States.GAME_OVER:
-                    // use latches — raw button pulses missed at slow speed
-                    if (latches.q[0] | latches.q[1] | latches.q[2] | latches.q[3] | latches.q[4]) {
+                    // Only drop button advances — transition to RESTART_WAIT to
+                    // debounce the release before showing idle face.
+                    if (latches.q[4]) {
                         state.d = States.RESTART_WAIT
                         latches.d = 5b0  // clear all latches
                     }
 
                 States.RESTART_WAIT:
-                    // wait for all buttons released — check latches are clear
+                    // Wait for all latches clear, then show idle face
                     if (!latches.q[0] & !latches.q[1] & !latches.q[2] & !latches.q[3] & !latches.q[4]) {
+                        state.d = States.IDLE_FACE
+                    }
+
+                States.IDLE_FACE:
+                    // Show idle face until drop is pressed to start a new game
+                    if (latches.q[4]) {
                         state.d = States.INIT
+                        latches.d = 5b0  // clear all latches before entering game
                     }
             }
 
