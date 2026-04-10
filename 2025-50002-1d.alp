@@ -232,6 +232,12 @@
                     "type": "DiskFile",
                     "path": "source/game_display.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/win_display.luc"
+                }
             }
         ],
         "constraintFiles": [
