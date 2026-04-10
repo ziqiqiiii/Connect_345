@@ -28,7 +28,8 @@ module fsm (
     output wdsel[2],        // WDSEL mux select
     output fsm_state[5],    // debug: current state index
     output game_over,       // 1 when in GAME_OVER or RESTART_WAIT
-    output idle_face        // 1 when in IDLE_FACE (show face animation)
+    output idle_face,       // 1 when in IDLE_FACE (show face animation)
+    output winner_out[2]    // latched winner: 0=P1, 1=P2, 2=draw
 ) {
 
     // ── ALUFN constants (verified from alu.luc) ───────────────────────────────
@@ -86,7 +87,8 @@ module fsm (
             dff state[$width(States)](#INIT(States.IDLE_FACE))
             dff init_counter[4](#INIT(0))
             dff slow_ctr[20](#INIT(0))
-            dff latches[5](#INIT(0))  // [0]=p1l [1]=p1r [2]=p2l [3]=p2r [4]=drop
+            dff latches[5](#INIT(0))   // [0]=p1l [1]=p1r [2]=p2l [3]=p2r [4]=drop
+            dff winner_code[2](#INIT(2b10))  // 0=P1 wins, 1=P2 wins, 2=draw
         }
     }
 
@@ -103,6 +105,19 @@ module fsm (
         bsel    = 3b000
         wdsel   = 2b00
         state.d = state.q
+
+        // ── Winner code: latch the outcome as soon as we enter a win state ──────
+        // This avoids relying on score-register sentinel values (0xF) which can
+        // collide with legitimate gameplay scores on a 5×5 board.
+        winner_code.d = winner_code.q  // hold by default
+        if (state.q == States.P1_WINS) {
+            winner_code.d = 2b00
+        } else if (state.q == States.P2_WINS) {
+            winner_code.d = 2b01
+        } else if ((state.q == States.DRAW_0) | (state.q == States.DRAW_1)) {
+            winner_code.d = 2b10
+        }
+        winner_out = winner_code.q
 
         // ── game_over: only after win-marker write has committed to regfile ─────
         // P1_WINS/P2_WINS/DRAW_x execute for one slow_ctr period before

@@ -40,12 +40,15 @@ module game_display (
 
         case (cell) {
             // ── Cursor row (cells 0-4): player color on active column ────────
+            // The cursor row (pixels 0-14) goes physically LEFT→RIGHT, while the
+            // board matrix row 0 snakes RIGHT→LEFT, placing col4 at physical LEFT
+            // and col0 at physical RIGHT.  Mirror the cursor mapping to match.
             // P1=RED, P2=YELLOW — matches the board piece colors
-            0:  color = (curr_col == 0) ? (curr_player == 0 ? RED : YELLOW) : OFF
-            1:  color = (curr_col == 1) ? (curr_player == 0 ? RED : YELLOW) : OFF
+            0:  color = (curr_col == 4) ? (curr_player == 0 ? RED : YELLOW) : OFF
+            1:  color = (curr_col == 3) ? (curr_player == 0 ? RED : YELLOW) : OFF
             2:  color = (curr_col == 2) ? (curr_player == 0 ? RED : YELLOW) : OFF
-            3:  color = (curr_col == 3) ? (curr_player == 0 ? RED : YELLOW) : OFF
-            4:  color = (curr_col == 4) ? (curr_player == 0 ? RED : YELLOW) : OFF
+            3:  color = (curr_col == 1) ? (curr_player == 0 ? RED : YELLOW) : OFF
+            4:  color = (curr_col == 0) ? (curr_player == 0 ? RED : YELLOW) : OFF
 
             // ── Board row 4 TOP (cells 5-9): col0→bit4, col1→bit10, … ────────
             5:  color = p1_board[28]  ? RED : (p2_board[28]  ? YELLOW : OFF)

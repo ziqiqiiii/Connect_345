@@ -44,12 +44,11 @@ module alchitry_top (
             ws2812b_driver driver(#PIXEL_COUNT(PIXEL_COUNT))
             win_display wd
             face_display fd
-            dff game_over_prev(#INIT(0))  // for rising-edge trigger on win_display
+            dff game_over_prev(#INIT(0))   // rising-edge detect for win_display trigger
+            dff idle_face_prev(#INIT(0))   // rising-edge detect for face reset trigger
         }
     }
     game_display display
-
-    sig winner[2]  // 0=P1 won, 1=P2 won, 2=draw (derived from score registers)
 
     always {
         reset_cond.in = ~rst_n
@@ -60,12 +59,6 @@ module alchitry_top (
         led        = 8h00
         io_segment = 8hff
         io_select  = 4hf
-
-        // ── Derive winner from score registers (set by FSM win states) ────
-        // R4 = 0xF when P1 wins, R5 = 0xF when P2 wins, both 0xFFFF on draw
-        winner = dp.p1_score_out == 32hF ? 2b00 :
-                 dp.p2_score_out == 32hF ? 2b01 :
-                 2b10
 
         // ── Debug read port ───────────────────────────────────────
         // io_dip[0][3:0]  = register address (R0–R12)
@@ -118,16 +111,18 @@ module alchitry_top (
 
         // ── Win display trigger (rising edge of game_over) ───────────────
         game_over_prev.d = game_fsm.game_over
+        idle_face_prev.d = game_fsm.idle_face
 
         // ── Wire win_display ──────────────────────────────────────────────
         wd.pixel_address = driver.pixel_address
-        wd.winner        = winner
+        wd.winner        = game_fsm.winner_out   // from FSM's latched winner_code DFF
         wd.trigger       = game_fsm.game_over & !game_over_prev.q
         wd.frame_done    = driver.done
 
         // ── Wire face_display ─────────────────────────────────────────────
         fd.pixel_address = driver.pixel_address
         fd.frame_done    = driver.done
+        fd.trigger       = game_fsm.idle_face & !idle_face_prev.q  // rising edge: reset face
 
         // ── Wire Display → Driver (priority: game_over > idle_face > game) ─
         if (game_fsm.game_over) {
