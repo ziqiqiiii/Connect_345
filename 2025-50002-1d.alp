@@ -238,6 +238,12 @@
                     "type": "DiskFile",
                     "path": "source/win_display.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/face_display.luc"
+                }
             }
         ],
         "constraintFiles": [
