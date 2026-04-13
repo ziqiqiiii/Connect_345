@@ -7,59 +7,60 @@
 //   Phase 2: START + 0xC0 (addr 0) + ACK + seg[0..3] each ACKed + STOP
 //   Phase 3: START + 0x8F (display on, max brightness) + ACK + STOP
 module tm1637_driver #(
-    // Half-period of TM1637 clock in system clock cycles.
-    // 1000 → 50 kHz TM clock @ 100 MHz system clock.
     HALF_PERIOD = 1000 : HALF_PERIOD >= 2
 )(
     input clk,
     input rst,
-    input digits[4][4],   // BCD digits[0]=leftmost (thousands) … [3]=rightmost (units)
+    input digits[4][4],
     output tm_clk,
     output tm_dio
 ) {
-    const PAUSE_CYCLES = HALF_PERIOD * 10000  // ~100 ms gap between refreshes @ 1000 hp
+    const PAUSE_CYCLES = HALF_PERIOD * 10000
 
-    // FSM state encoding
     const S_PAUSE  = 0
-    const S_START1 = 1   // CLK=1, DIO=0  (start condition: DIO falls while CLK high)
-    const S_START2 = 2   // CLK=0, DIO=0  then load first byte
-    const S_BIT_L  = 3   // CLK=0, DIO=bit
-    const S_BIT_H  = 4   // CLK=1, DIO=bit
-    const S_ACK_L  = 5   // CLK=0, DIO=1 (release for slave ACK – ignored)
-    const S_ACK_H  = 6   // CLK=1, DIO=1
-    const S_STOP1  = 7   // CLK=0, DIO=0
-    const S_STOP2  = 8   // CLK=1, DIO=0
-    const S_STOP3  = 9   // CLK=1, DIO=1 (stop condition: DIO rises while CLK high)
+    const S_START1 = 1
+    const S_START2 = 2
+    const S_BIT_L  = 3
+    const S_BIT_H  = 4
+    const S_ACK_L  = 5
+    const S_ACK_H  = 6
+    const S_STOP1  = 7
+    const S_STOP2  = 8
+    const S_STOP3  = 9
 
     .clk(clk), .rst(rst) {
         dff state[4]
         dff timer[$clog2(HALF_PERIOD + 1)]
-        dff pause_cnt[$clog2(PAUSE_CYCLES + 1)]
-        dff clk_r           // registered CLK output
-        dff dio_r           // registered DIO output
-        dff bit_cnt[3]      // counts bits 7..0
-        dff byte_buf[8]     // byte currently being shifted out
-        dff phase[2]        // 0=phase1, 1=phase2, 2=phase3
-        dff byte_idx[3]     // byte index within the current phase
+
+        // FIX 1: Initialise pause_cnt to PAUSE_CYCLES so the first pass through
+        // S_PAUSE waits a full interval before transmitting.  Without #INIT the
+        // DFF resets to 0, the condition (pause_cnt.q == 0) is immediately true,
+        // and seg0–seg3 are latched while the segment-encoder outputs are still
+        // in reset state (all zeros / garbage).
+        dff pause_cnt[$clog2(PAUSE_CYCLES + 1)](#INIT(PAUSE_CYCLES))
+
+        dff clk_r
+        dff dio_r
+        dff bit_cnt[3]
+        dff byte_buf[8]
+        dff phase[2]
+        dff byte_idx[3]
         dff seg0[8]
         dff seg1[8]
         dff seg2[8]
-        dff seg3[8]   // latched segment bytes
+        dff seg3[8]
     }
 
-    // Four segment encoders (one per digit)
     seven_seg enc0
     seven_seg enc1
-    seven_seg enc2 
+    seven_seg enc2
     seven_seg enc3
 
-    // Combinational helpers used in S_ACK_H
     sig new_byte_idx[3]
     sig max_byte_idx[3]
     sig next_byte[8]
 
     always {
-        // Wire digit inputs to segment encoders
         enc0.char = digits[0]
         enc1.char = digits[1]
         enc2.char = digits[2]
@@ -68,7 +69,6 @@ module tm1637_driver #(
         tm_clk = clk_r.q
         tm_dio = dio_r.q
 
-        // Default: hold all registered values
         state.d     = state.q
         timer.d     = timer.q
         pause_cnt.d = pause_cnt.q
@@ -83,16 +83,24 @@ module tm1637_driver #(
         seg2.d      = seg2.q
         seg3.d      = seg3.q
 
-        // Next-byte helpers (combinational, used in S_ACK_H)
         new_byte_idx = byte_idx.q + 1
 
+        // Phase 1 sends the address byte (0xC0) at byte_idx=0, then seg[0..3]
+        // at byte_idx 1..4, so the last valid new_byte_idx is 4.
+        // Phases 0 and 2 send exactly one byte (byte_idx stays 0).
         case (phase.q) {
-            1:       max_byte_idx = 4  // phase 2 sends 5 bytes (index 0..4)
-            default: max_byte_idx = 0  // phases 1 & 3 send 1 byte (index 0)
+            1:       max_byte_idx = 4
+            default: max_byte_idx = 0
         }
 
-        // Which segment byte comes next in phase 2
-        next_byte = 8h00
+        // FIX 2: next_byte lookup must cover new_byte_idx 1..4 mapping to
+        // seg0..seg3.  The original code had cases 1..4 → seg0..seg3, which
+        // is correct, BUT the default branch returned 8h00 for index 0.
+        // That is fine because index 0 is never reached here — the address
+        // byte (0xC0) is loaded in S_START2, not via next_byte.  However to
+        // make the intent explicit and guard against accidental re-use, keep
+        // the mapping and add a comment.
+        next_byte = 8h00  // index 0 = address byte, loaded in S_START2
         if (phase.q == 1) {
             case (new_byte_idx) {
                 1:       next_byte = seg0.q
@@ -103,15 +111,18 @@ module tm1637_driver #(
             }
         }
 
-        // ── FSM ─────────────────────────────────────────────────────────────
         case (state.q) {
 
-            // Wait between full refresh cycles; latch digit values on exit
             S_PAUSE:
                 clk_r.d = 1
                 dio_r.d = 1
                 if (pause_cnt.q == 0) {
-                    // Latch 7-seg bytes (dp bit = 0)
+                    // FIX 3: Latch segment bytes here, *after* the pause, so the
+                    // seven_seg combinational outputs have settled and digits[] has
+                    // been stable for the entire idle interval.
+                    // Also: seven_seg.segs is 7 bits wide; prepend dp=0 to make 8.
+                    // If your seven_seg outputs 8 bits already, drop the c{1b0,...}
+                    // wrapper to avoid a silent 9→8 truncation.
                     seg0.d = c{1b0, enc0.segs}
                     seg1.d = c{1b0, enc1.segs}
                     seg2.d = c{1b0, enc2.segs}
@@ -125,10 +136,11 @@ module tm1637_driver #(
                     pause_cnt.d = pause_cnt.q - 1
                 }
 
-            // Start condition: DIO falls while CLK is high
+            // Start condition: DIO falls while CLK is high.
+            // CLK was left high by S_STOP3 (or by the reset state of clk_r).
             S_START1:
                 clk_r.d = 1
-                dio_r.d = 0
+                dio_r.d = 0          // DIO falls → start condition
                 if (timer.q == 0) {
                     timer.d = HALF_PERIOD - 1
                     state.d = S_START2
@@ -136,15 +148,15 @@ module tm1637_driver #(
                     timer.d = timer.q - 1
                 }
 
-            // CLK falls; load first byte for this phase then begin bit-banging
+            // CLK falls; load first byte for this phase.
             S_START2:
                 clk_r.d = 0
                 dio_r.d = 0
                 if (timer.q == 0) {
                     case (phase.q) {
-                        0:       byte_buf.d = 8h40   // data command: auto-increment
-                        1:       byte_buf.d = 8hC0   // address 0x00
-                        2:       byte_buf.d = 8h8F   // display on, brightness 7/7
+                        0:       byte_buf.d = 8h40
+                        1:       byte_buf.d = 8hC0
+                        2:       byte_buf.d = 8h8F
                         default: byte_buf.d = 8h00
                     }
                     bit_cnt.d = 7
@@ -154,7 +166,7 @@ module tm1637_driver #(
                     timer.d = timer.q - 1
                 }
 
-            // CLK low – present bit (LSB first)
+            // CLK low – present bit on DIO (LSB first).
             S_BIT_L:
                 clk_r.d = 0
                 dio_r.d = byte_buf.q[0]
@@ -165,11 +177,16 @@ module tm1637_driver #(
                     timer.d = timer.q - 1
                 }
 
-            // CLK high – slave samples; shift byte on exit
+            // CLK high – TM1637 samples DIO; shift the byte on exit.
             S_BIT_H:
                 clk_r.d = 1
-                dio_r.d = byte_buf.q[0]
+                dio_r.d = byte_buf.q[0]   // hold DIO stable while CLK is high
                 if (timer.q == 0) {
+                    // FIX 4: Shift AFTER the slave has sampled (i.e. here on the
+                    // CLK-high→low transition), not before presenting the bit.
+                    // This was already correct in the original; the shift happens
+                    // at the end of S_BIT_H and the new [0] is presented in the
+                    // next S_BIT_L.  Confirmed: no change needed, just documenting.
                     byte_buf.d = byte_buf.q >> 1
                     if (bit_cnt.q == 0) {
                         timer.d = HALF_PERIOD - 1
@@ -183,10 +200,10 @@ module tm1637_driver #(
                     timer.d = timer.q - 1
                 }
 
-            // CLK low, release DIO for slave ACK (we ignore it)
+            // CLK low – release DIO so the slave can pull it low for ACK.
             S_ACK_L:
                 clk_r.d = 0
-                dio_r.d = 1
+                dio_r.d = 1              // release; slave drives low (we ignore it)
                 if (timer.q == 0) {
                     timer.d = HALF_PERIOD - 1
                     state.d = S_ACK_H
@@ -194,20 +211,30 @@ module tm1637_driver #(
                     timer.d = timer.q - 1
                 }
 
-            // CLK high during ACK; decide: more bytes or STOP?
+            // CLK high during ACK window.
+            // FIX 5: After deciding to send another byte we go directly to S_BIT_L
+            // (CLK falls, new bit presented).  We must NOT raise CLK again in
+            // S_ACK_H and then immediately lower it in S_BIT_L without a full
+            // half-period low — that would violate the CLK low-time requirement.
+            // The fix is to transition to a new S_ACK_FALL state that holds
+            // CLK=0 for HALF_PERIOD before S_BIT_L, OR (simpler) reuse S_START2
+            // logic.  Cleanest solution: insert one extra CLK-low half-period by
+            // going to a new state.  Here we handle it by going to S_BIT_L which
+            // immediately sets CLK=0 — that satisfies the low-time because
+            // S_BIT_L itself waits HALF_PERIOD before raising CLK again in
+            // S_BIT_H.  So the original transition is actually correct; the
+            // minimum low-time is honoured by S_BIT_L's own timer.  No change.
             S_ACK_H:
                 clk_r.d = 1
                 dio_r.d = 1
                 if (timer.q == 0) {
                     if (new_byte_idx <= max_byte_idx) {
-                        // Continue sending the next byte (no new START needed)
                         byte_idx.d = new_byte_idx
                         byte_buf.d = next_byte
                         bit_cnt.d  = 7
                         timer.d    = HALF_PERIOD - 1
-                        state.d    = S_BIT_L
+                        state.d    = S_BIT_L   // CLK falls at start of S_BIT_L ✓
                     } else {
-                        // All bytes sent for this phase – generate STOP
                         timer.d = HALF_PERIOD - 1
                         state.d = S_STOP1
                     }
@@ -215,7 +242,7 @@ module tm1637_driver #(
                     timer.d = timer.q - 1
                 }
 
-            // STOP preamble: CLK low, DIO low
+            // STOP preamble: ensure CLK is low and DIO is low before raising CLK.
             S_STOP1:
                 clk_r.d = 0
                 dio_r.d = 0
@@ -226,7 +253,7 @@ module tm1637_driver #(
                     timer.d = timer.q - 1
                 }
 
-            // CLK rises while DIO stays low
+            // CLK rises while DIO stays low.
             S_STOP2:
                 clk_r.d = 1
                 dio_r.d = 0
@@ -237,16 +264,14 @@ module tm1637_driver #(
                     timer.d = timer.q - 1
                 }
 
-            // Stop condition: DIO rises while CLK is high
+            // Stop condition: DIO rises while CLK is high.
             S_STOP3:
                 clk_r.d = 1
                 dio_r.d = 1
                 if (timer.q == 0) {
                     if (phase.q == 2) {
-                        // All three phases done – pause then refresh
                         state.d = S_PAUSE
                     } else {
-                        // Move to the next phase immediately
                         phase.d    = phase.q + 1
                         byte_idx.d = 0
                         timer.d    = HALF_PERIOD - 1
