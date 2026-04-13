@@ -54,9 +54,8 @@ module alchitry_top (
             ws2812b_driver driver(#PIXEL_COUNT(PIXEL_COUNT))
             win_display wd
             face_display fd
-            dff game_over_prev(#INIT(0))   // rising-edge detect for win_display trigger
-            dff idle_face_prev(#INIT(0))   // rising-edge detect for face reset trigger
-            
+            dff game_over_prev(#INIT(0))  // for rising-edge trigger on win_display
+
             // ── 7-segment test modules ────────────────────────────
             multi_seven_seg seg(#DIV(SEVEN_SEG_DIV))
             tm1637_driver tm1637(#HALF_PERIOD(TM_HALF_PERIOD))
@@ -65,6 +64,8 @@ module alchitry_top (
     }
     game_display display
     bin_to_dec btd(#DIGITS(4))
+
+    sig winner[2]  // 0=P1 won, 1=P2 won, 2=draw (derived from score registers)
 
     sig winner[2]  // 0=P1 won, 1=P2 won, 2=draw (derived from score registers)
 
@@ -135,18 +136,22 @@ module alchitry_top (
 
         // ── Win display trigger (rising edge of game_over) ───────────────
         game_over_prev.d = game_fsm.game_over
-        idle_face_prev.d = game_fsm.idle_face
 
         // ── Wire win_display ──────────────────────────────────────────────
         wd.pixel_address = driver.pixel_address
-        wd.winner        = game_fsm.winner_out   // from FSM's latched winner_code DFF
+        wd.winner        = winner
         wd.trigger       = game_fsm.game_over & !game_over_prev.q
         wd.frame_done    = driver.done
 
         // ── Wire face_display ─────────────────────────────────────────────
         fd.pixel_address = driver.pixel_address
         fd.frame_done    = driver.done
-        fd.trigger       = game_fsm.idle_face & !idle_face_prev.q  // rising edge: reset face
+        // Gate button heat presses to idle_face state only.
+        // Bit order: [3]=P2 right [2]=P2 left [1]=P1 right [0]=P1 left
+        fd.heat_btn = c{game_fsm.idle_face & edge4.out,
+                        game_fsm.idle_face & edge3.out,
+                        game_fsm.idle_face & edge2.out,
+                        game_fsm.idle_face & edge0.out}
 
         // ── Wire Display → Driver (priority: game_over > idle_face > game) ─
         if (game_fsm.game_over) {
