@@ -13,10 +13,14 @@ module alchitry_top (
     // Physical header buttons (Bank C, active-low, PULLUP in ACF)
     // [0]=C39 P1 left  [1]=C42 P1 right  [2]=C43 drop
     // [3]=C45 P2 left  [4]=C48 P2 right
-    input game_btn[5]
+    input game_btn[5],
+    output tm_clk,         // TM1637 clock  — C23
+    output tm_dio          // TM1637 data   — C24
 ) {
     const CLK_FREQ = $is_sim() ? 1000 : 100000000
     const PIXEL_COUNT = 90
+    const SEVEN_SEG_DIV = $is_sim() ? 3 : 16
+    const TM_HALF_PERIOD = $is_sim() ? 2 : 1000  // 50 kHz TM1637 clock @ 100 MHz
 
     sig rst
 
@@ -37,6 +41,12 @@ module alchitry_top (
         edge_detector edge3(#RISE(1), #FALL(0), .in(btn3.out))
         edge_detector edge4(#RISE(1), #FALL(0), .in(btn4.out))
 
+        // ── IO Shield buttons for 7-seg test (active-high, pulled down) ──
+        button_conditioner io_btn0(#CLK_FREQ(CLK_FREQ), .in(io_button[0]))  // next preset
+        button_conditioner io_btn1(#CLK_FREQ(CLK_FREQ), .in(io_button[1]))  // prev preset
+        edge_detector io_edge0(#RISE(1), #FALL(0), .in(io_btn0.out))
+        edge_detector io_edge1(#RISE(1), #FALL(0), .in(io_btn1.out))
+
         .rst(rst) {
             // ── Core modules ──────────────────────────────────────
             datapath dp
@@ -46,9 +56,17 @@ module alchitry_top (
             face_display fd
             dff game_over_prev(#INIT(0))   // rising-edge detect for win_display trigger
             dff idle_face_prev(#INIT(0))   // rising-edge detect for face reset trigger
+            
+            // ── 7-segment test modules ────────────────────────────
+            multi_seven_seg seg(#DIV(SEVEN_SEG_DIV))
+            tm1637_driver tm1637(#HALF_PERIOD(TM_HALF_PERIOD))
+            seg_test tester
         }
     }
     game_display display
+    bin_to_dec btd(#DIGITS(4))
+
+    sig winner[2]  // 0=P1 won, 1=P2 won, 2=draw (derived from score registers)
 
     always {
         reset_cond.in = ~rst_n
@@ -59,6 +77,12 @@ module alchitry_top (
         led        = 8h00
         io_segment = 8hff
         io_select  = 4hf
+
+        // ── Derive winner from score registers (set by FSM win states) ────
+        // R4 = 0xF when P1 wins, R5 = 0xF when P2 wins, both 0xFFFF on draw
+        winner = dp.p1_score_out == 32hF ? 2b00 :
+                 dp.p2_score_out == 32hF ? 2b01 :
+                 2b10
 
         // ── Debug read port ───────────────────────────────────────
         // io_dip[0][3:0]  = register address (R0–R12)
@@ -135,5 +159,24 @@ module alchitry_top (
         driver.update = 1
         driver.clear  = 0
         data          = driver.data
+
+        // ── 7-segment test: io_button[0]=next preset, io_button[1]=prev ──
+        tester.btn_next = io_edge0.out
+        tester.btn_prev = io_edge1.out
+
+        btd.value = tester.value   // binary → BCD
+
+        // IO Shield 7-segment
+        seg.values = btd.digits
+        io_segment = ~seg.seg
+        io_select  = ~seg.sel
+
+        // TM1637 external display (digits[0]=leftmost, so reverse bin_to_dec order)
+        tm1637.digits[0] = btd.digits[3]  // thousands → leftmost
+        tm1637.digits[1] = btd.digits[2]
+        tm1637.digits[2] = btd.digits[1]
+        tm1637.digits[3] = btd.digits[0]  // ones → rightmost
+        tm_clk = tm1637.tm_clk
+        tm_dio = tm1637.tm_dio
     }
 }

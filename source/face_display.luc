@@ -444,7 +444,9 @@ module face_display (
                 } else {
                     is_eye = EXPL3[$resize(box_index, $clog2($width(EXPL3, 0)))]
                 }
-                if (is_eye) { color = RED }
+                if (is_eye) { 
+                    color = RED 
+                }
 
             } else if (state.q == S_RED) {
                 is_eye = EYE_CENTER[$resize(box_index, $clog2($width(EYE_CENTER, 0)))]
@@ -496,7 +498,9 @@ module face_display (
                 } else if (state.q == S_RIGHT_DOWN) {
                     is_eye = EYE_RIGHT_DOWN[$resize(box_index, $clog2($width(EYE_RIGHT_DOWN, 0)))]
                 }
-                if (is_eye) { color = WHITE }
+                if (is_eye) { 
+                        color = WHITE 
+                }
             }
         }
         // box_index >= 25 (top row): stays black

@@ -1,0 +1,5 @@
+// TM1637 4-digit 7-segment display
+PINOUT(V1), STANDARD(LVCMOS33) {
+    pin tm_clk C23
+    pin tm_dio C24
+}
