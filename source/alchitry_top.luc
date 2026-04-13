@@ -7,13 +7,9 @@ module alchitry_top (
     output io_led[3][8],
     output io_segment[8],
     output io_select[4],
-    input io_button[5],    // io_shield buttons (kept for constraint; not used for game)
+    input io_button[5],
     input io_dip[3][8],
-    output data,           // WS2812B data line C40
-    // Physical header buttons (Bank C, active-low, PULLUP in ACF)
-    // [0]=C39 P1 left  [1]=C42 P1 right  [2]=C43 drop
-    // [3]=C45 P2 left  [4]=C48 P2 right
-    input game_btn[5]
+    output data              // WS2812B data line C40
 ) {
     const CLK_FREQ = $is_sim() ? 1000 : 100000000
     const PIXEL_COUNT = 90
@@ -23,12 +19,12 @@ module alchitry_top (
     .clk(clk) {
         reset_conditioner reset_cond
 
-        // ── Button conditioners (game_btn is active-low; invert before conditioning) ──
-        button_conditioner btn0(#CLK_FREQ(CLK_FREQ), .in(~game_btn[0]))  // P1 left  C39
-        button_conditioner btn1(#CLK_FREQ(CLK_FREQ), .in(~game_btn[2]))  // drop     C43
-        button_conditioner btn2(#CLK_FREQ(CLK_FREQ), .in(~game_btn[1]))  // P1 right C42
-        button_conditioner btn3(#CLK_FREQ(CLK_FREQ), .in(~game_btn[3]))  // P2 left  C45
-        button_conditioner btn4(#CLK_FREQ(CLK_FREQ), .in(~game_btn[4]))  // P2 right C48
+        // ── Button conditioners ───────────────────────────────────
+        button_conditioner btn0(#CLK_FREQ(CLK_FREQ), .in(io_button[0]))  // P1 left
+        button_conditioner btn1(#CLK_FREQ(CLK_FREQ), .in(io_button[1]))  // drop
+        button_conditioner btn2(#CLK_FREQ(CLK_FREQ), .in(io_button[2]))  // P1 right
+        button_conditioner btn3(#CLK_FREQ(CLK_FREQ), .in(io_button[3]))  // P2 left
+        button_conditioner btn4(#CLK_FREQ(CLK_FREQ), .in(io_button[4]))  // P2 right
 
         // ── Edge detectors ────────────────────────────────────────
         edge_detector edge0(#RISE(1), #FALL(0), .in(btn0.out))
@@ -43,8 +39,7 @@ module alchitry_top (
             fsm game_fsm
             ws2812b_driver driver(#PIXEL_COUNT(PIXEL_COUNT))
             win_display wd
-            face_display fd
-            dff game_over_prev(#INIT(0))  // for rising-edge trigger on win_display
+            dff game_over_prev(#INIT(0))  // for rising-edge trigger
         }
     }
     game_display display
@@ -109,7 +104,7 @@ module alchitry_top (
         game_fsm.btn_p2_left  = edge3.out
         game_fsm.btn_p2_right = edge4.out
 
-        // ── Wire Datapath → game_display ─────────────────────────
+        // ── Wire Datapath → Display ───────────────────────────────
         display.pixel_address = driver.pixel_address
         display.p1_board      = dp.p1_board_out
         display.p2_board      = dp.p2_board_out
@@ -125,15 +120,9 @@ module alchitry_top (
         wd.trigger       = game_fsm.game_over & !game_over_prev.q
         wd.frame_done    = driver.done
 
-        // ── Wire face_display ─────────────────────────────────────────────
-        fd.pixel_address = driver.pixel_address
-        fd.frame_done    = driver.done
-
-        // ── Wire Display → Driver (priority: game_over > idle_face > game) ─
+        // ── Wire Display → Driver (mux: win animation vs normal board) ───
         if (game_fsm.game_over) {
             driver.color = wd.color
-        } else if (game_fsm.idle_face) {
-            driver.color = fd.color
         } else {
             driver.color = display.color
         }
