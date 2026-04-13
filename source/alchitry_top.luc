@@ -128,6 +128,12 @@ module alchitry_top (
         // ── Wire face_display ─────────────────────────────────────────────
         fd.pixel_address = driver.pixel_address
         fd.frame_done    = driver.done
+        // Gate button heat presses to idle_face state only.
+        // Bit order: [3]=P2 right [2]=P2 left [1]=P1 right [0]=P1 left
+        fd.heat_btn = c{game_fsm.idle_face & edge4.out,
+                        game_fsm.idle_face & edge3.out,
+                        game_fsm.idle_face & edge2.out,
+                        game_fsm.idle_face & edge0.out}
 
         // ── Wire Display → Driver (priority: game_over > idle_face > game) ─
         if (game_fsm.game_over) {
