@@ -11,11 +11,14 @@ module alchitry_top (
     input io_dip[3][8],
     output data,           // WS2812B data line C40
     // Physical header buttons (Bank C, active-low, PULLUP in ACF)
-    // [0]=C39 P1 left  [1]=C42 P1 right  [2]=C43 drop
-    // [3]=C45 P2 left  [4]=C48 P2 right
-    input game_btn[5],
-    output tm_clk,         // TM1637 clock  — C23
-    output tm_dio          // TM1637 data   — C24
+    // p1_btn: [0]=C39 left  [1]=C42 right  [2]=C43 drop
+    // p2_btn: [0]=C45 left  [1]=C48 right
+    input p1_btn[3],
+    input p2_btn[2],
+    output tm_clk,         // TM1637 P1 clock — C23
+    output tm_dio,         // TM1637 P1 data  — C24
+    output tm2_clk,        // TM1637 P2 clock — C27
+    output tm2_dio         // TM1637 P2 data  — C28
 ) {
     const CLK_FREQ = $is_sim() ? 1000 : 100000000
     const PIXEL_COUNT = 90
@@ -27,12 +30,12 @@ module alchitry_top (
     .clk(clk) {
         reset_conditioner reset_cond
 
-        // ── Button conditioners (game_btn is active-low; invert before conditioning) ──
-        button_conditioner btn0(#CLK_FREQ(CLK_FREQ), .in(~game_btn[0]))  // P1 left  C39
-        button_conditioner btn1(#CLK_FREQ(CLK_FREQ), .in(~game_btn[2]))  // drop     C43
-        button_conditioner btn2(#CLK_FREQ(CLK_FREQ), .in(~game_btn[1]))  // P1 right C42
-        button_conditioner btn3(#CLK_FREQ(CLK_FREQ), .in(~game_btn[3]))  // P2 left  C45
-        button_conditioner btn4(#CLK_FREQ(CLK_FREQ), .in(~game_btn[4]))  // P2 right C48
+        // ── Button conditioners (active-low; invert before conditioning) ──────
+        button_conditioner btn0(#CLK_FREQ(CLK_FREQ), .in(~p1_btn[0]))  // P1 left  C39
+        button_conditioner btn1(#CLK_FREQ(CLK_FREQ), .in(~p1_btn[2]))  // drop     C43
+        button_conditioner btn2(#CLK_FREQ(CLK_FREQ), .in(~p1_btn[1]))  // P1 right C42
+        button_conditioner btn3(#CLK_FREQ(CLK_FREQ), .in(~p2_btn[0]))  // P2 left  C45
+        button_conditioner btn4(#CLK_FREQ(CLK_FREQ), .in(~p2_btn[1]))  // P2 right C48
 
         // ── Edge detectors ────────────────────────────────────────
         edge_detector edge0(#RISE(1), #FALL(0), .in(btn0.out))
@@ -40,12 +43,6 @@ module alchitry_top (
         edge_detector edge2(#RISE(1), #FALL(0), .in(btn2.out))
         edge_detector edge3(#RISE(1), #FALL(0), .in(btn3.out))
         edge_detector edge4(#RISE(1), #FALL(0), .in(btn4.out))
-
-        // ── IO Shield buttons for 7-seg test (active-high, pulled down) ──
-        button_conditioner io_btn0(#CLK_FREQ(CLK_FREQ), .in(io_button[0]))  // next preset
-        button_conditioner io_btn1(#CLK_FREQ(CLK_FREQ), .in(io_button[1]))  // prev preset
-        edge_detector io_edge0(#RISE(1), #FALL(0), .in(io_btn0.out))
-        edge_detector io_edge1(#RISE(1), #FALL(0), .in(io_btn1.out))
 
         .rst(rst) {
             // ── Core modules ──────────────────────────────────────
@@ -56,16 +53,15 @@ module alchitry_top (
             face_display fd
             dff game_over_prev(#INIT(0))  // for rising-edge trigger on win_display
 
-            // ── 7-segment test modules ────────────────────────────
-            multi_seven_seg seg(#DIV(SEVEN_SEG_DIV))
-            tm1637_driver tm1637(#HALF_PERIOD(TM_HALF_PERIOD))
-            seg_test tester
+            // ── Score display modules ─────────────────────────────
+            multi_seven_seg seg(#DIV(SEVEN_SEG_DIV))   // IO Shield 7-seg (P2 score)
+            tm1637_driver tm1637(#HALF_PERIOD(TM_HALF_PERIOD))   // P1: C23/C24
+            tm1637_driver tm1637_p2(#HALF_PERIOD(TM_HALF_PERIOD)) // P2: C27/C28
         }
     }
     game_display display
-    bin_to_dec btd(#DIGITS(4))
-
-    sig winner[2]  // 0=P1 won, 1=P2 won, 2=draw (derived from score registers)
+    bin_to_dec btd(#DIGITS(4))    // P1 score → BCD
+    bin_to_dec btd2(#DIGITS(4))   // P2 score → BCD
 
     sig winner[2]  // 0=P1 won, 1=P2 won, 2=draw (derived from score registers)
 
@@ -165,23 +161,29 @@ module alchitry_top (
         driver.clear  = 0
         data          = driver.data
 
-        // ── 7-segment test: io_button[0]=next preset, io_button[1]=prev ──
-        tester.btn_next = io_edge0.out
-        tester.btn_prev = io_edge1.out
+        // ── Score display ─────────────────────────────────────────
+        btd.value  = dp.p1_score_out[15:0]   // P1 score → BCD
+        btd2.value = dp.p2_score_out[15:0]   // P2 score → BCD
 
-        btd.value = tester.value   // binary → BCD
-
-        // IO Shield 7-segment
-        seg.values = btd.digits
-        io_segment = ~seg.seg
-        io_select  = ~seg.sel
-
-        // TM1637 external display (digits[0]=leftmost, so reverse bin_to_dec order)
-        tm1637.digits[0] = btd.digits[3]  // thousands → leftmost
+        // P1 TM1637 (C23/C24): digits[0]=leftmost, reverse bin_to_dec order
+        tm1637.digits[0] = btd.digits[3]   // thousands
         tm1637.digits[1] = btd.digits[2]
         tm1637.digits[2] = btd.digits[1]
-        tm1637.digits[3] = btd.digits[0]  // ones → rightmost
+        tm1637.digits[3] = btd.digits[0]   // ones
         tm_clk = tm1637.tm_clk
         tm_dio = tm1637.tm_dio
+
+        // P2 TM1637 (C27/C28)
+        tm1637_p2.digits[0] = btd2.digits[3]
+        tm1637_p2.digits[1] = btd2.digits[2]
+        tm1637_p2.digits[2] = btd2.digits[1]
+        tm1637_p2.digits[3] = btd2.digits[0]
+        tm2_clk = tm1637_p2.tm_clk
+        tm2_dio = tm1637_p2.tm_dio
+
+        // IO Shield 7-segment: P2 score
+        seg.values = btd2.digits
+        io_segment = ~seg.seg
+        io_select  = ~seg.sel
     }
 }

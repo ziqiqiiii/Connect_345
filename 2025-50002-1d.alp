@@ -16,7 +16,7 @@
                     "type": "Component",
                     "path": "Conditioning/reset_conditioner.luc"
                 }
-            },  
+            },
             {
                 "file": {
                     "type": "Component",
