@@ -1,50 +1,39 @@
 /* face_display.luc — Driver-less idle face animation for Connect-Four
  *
- * Full emotional-tier face animation (normal → blush → red eyes → explosion → fire)
- * identical in visuals to face_mode.luc from led_testing, but driver-less.
+ * Shows an animated face (normal tier: blink + look states) on the 5×5
+ * matrix. The top row stays dark. White eyes on black background.
  *
- * Heat auto-escalates over time (no external buttons needed):
- *   Every 1024 frame_done ticks (~2.8 s at 363 fps) heat increments by 1.
- *   Tier thresholds (same as face_mode.luc):
- *     heat 0      → Normal  (blink + look, white eyes)
- *     heat 1-15   → Blush   (white eyes + red cheeks, random wink)
- *     heat 16-17  → Red     (pulsating red eyes)
- *     heat 18+    → Expl→Fire (explosion ripple, then looping fire)
+ * Unlike face_mode, this module does NOT own a ws2812b_driver.
+ * It receives pixel_address from the shared driver in alchitry_top,
+ * outputs a color per pixel, and advances animation state on frame_done
+ * pulses (driver.done from alchitry_top).
  *
- * trigger: a 1-cycle high pulse resets heat/state to initial values
- *   (fired by alchitry_top on the rising edge of idle_face so the face
- *    starts fresh each time the game enters the idle screen).
+ * Used for the IDLE_FACE state: shown before a game starts and after
+ * a game ends (before the player presses drop to restart).
  */
 module face_display (
     input clk,
     input rst,
     input pixel_address[7],  // 0-89 from shared ws2812b_driver
     input frame_done,        // = driver.done pulse from alchitry_top
-    input trigger,           // 1-cycle pulse: reset face to initial state
     output color[24]         // 24-bit BRG color back to shared driver
 ) {
     // ── State constants ───────────────────────────────────────────────────────
-    const S_CENTER     = 5d0
-    const S_BLINK1     = 5d1   // half-closed (top row gone first)
-    const S_BLINK2     = 5d2   // fully closed
-    const S_BLINK3     = 5d3   // reopening
-    const S_RIGHT      = 5d4
-    const S_LEFT       = 5d5
-    const S_UP         = 5d6
-    const S_RIGHT_UP   = 5d7
-    const S_LEFT_UP    = 5d8
-    const S_RIGHT_DOWN = 5d9
-    const S_BLUSH      = 5d10
-    const S_BLUSH_W1   = 5d11  // wink: half-close left eye (top gone first)
-    const S_BLUSH_W2   = 5d12  // wink: left eye fully closed
-    const S_BLUSH_W3   = 5d13  // wink: left eye reopening
-    const S_RED        = 5d14
-    const S_EXPL1      = 5d15
-    const S_EXPL2      = 5d16
-    const S_EXPL3      = 5d17
-    const S_FIRE       = 5d18
+    const S_CENTER     = 4d0
+    const S_BLINK1     = 4d1   // half-closed (bottom row visible, top gone)
+    const S_BLINK2     = 4d2   // fully closed
+    const S_BLINK3     = 4d3   // reopening
+    const S_RIGHT      = 4d4
+    const S_LEFT       = 4d5
+    const S_UP         = 4d6
+    const S_RIGHT_UP   = 4d7
+    const S_LEFT_UP    = 4d8
+    const S_RIGHT_DOWN = 4d9
 
     // ── BOX_LOOKUP ────────────────────────────────────────────────────────────
+    // 90-entry ROM: physical LED address → logical box (0-29)
+    //   Top row  (LEDs  0-14): boxes 25-29
+    //   Matrix   (LEDs 15-89): boxes  0-24  (vis_row*5 + vis_col)
     const BOX_LOOKUP = $reverse({
         5d25,5d25,5d25, 5d26,5d26,5d26, 5d27,5d27,5d27, 5d28,5d28,5d28, 5d29,5d29,5d29,
         5d4, 5d4, 5d4,  5d3, 5d3, 5d3,  5d2, 5d2, 5d2,  5d1, 5d1, 5d1,  5d0, 5d0, 5d0,
@@ -54,7 +43,15 @@ module face_display (
         5d24,5d24,5d24, 5d23,5d23,5d23, 5d22,5d22,5d22, 5d21,5d21,5d21, 5d20,5d20,5d20
     })
 
-    // ── EYE MASKS ─────────────────────────────────────────────────────────────
+    // ── EYE MASKS (25-entry 1-bit, row-major) ─────────────────────────────────
+    // Eye baseline: rows 1-2, cols 1 and 3
+    //   mrow0: boxes  0- 4
+    //   mrow1: boxes  5- 9
+    //   mrow2: boxes 10-14
+    //   mrow3: boxes 15-19
+    //   mrow4: boxes 20-24
+
+    // Both eyes full (cols 1,3 × rows 1,2)
     const EYE_CENTER = $reverse({
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b1,1b0,1b1,1b0,   // mrow1: boxes 6, 8
@@ -62,13 +59,17 @@ module face_display (
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0
     })
+
+    // Blink half: bottom row only (mrow2 only, top row gone first)
     const EYE_BLINK_HALF = $reverse({
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0,
-        1b0,1b1,1b0,1b1,1b0,   // mrow2 only
+        1b0,1b1,1b0,1b1,1b0,   // mrow2: boxes 11,13
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0
     })
+
+    // Look right: cols 2,4 × rows 1,2
     const EYE_RIGHT = $reverse({
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b1,1b0,1b1,   // mrow1: boxes 7, 9
@@ -76,6 +77,8 @@ module face_display (
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0
     })
+
+    // Look left: cols 0,2 × rows 1,2
     const EYE_LEFT = $reverse({
         1b0,1b0,1b0,1b0,1b0,
         1b1,1b0,1b1,1b0,1b0,   // mrow1: boxes 5, 7
@@ -83,6 +86,8 @@ module face_display (
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0
     })
+
+    // Look up: cols 1,3 × rows 0,1
     const EYE_UP = $reverse({
         1b0,1b1,1b0,1b1,1b0,   // mrow0: boxes 1, 3
         1b0,1b1,1b0,1b1,1b0,   // mrow1: boxes 6, 8
@@ -90,6 +95,8 @@ module face_display (
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0
     })
+
+    // Look right-up: cols 2,4 × rows 0,1
     const EYE_RIGHT_UP = $reverse({
         1b0,1b0,1b1,1b0,1b1,   // mrow0: boxes 2, 4
         1b0,1b0,1b1,1b0,1b1,   // mrow1: boxes 7, 9
@@ -97,6 +104,8 @@ module face_display (
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0
     })
+
+    // Look left-up: cols 0,2 × rows 0,1
     const EYE_LEFT_UP = $reverse({
         1b1,1b0,1b1,1b0,1b0,   // mrow0: boxes 0, 2
         1b1,1b0,1b1,1b0,1b0,   // mrow1: boxes 5, 7
@@ -104,6 +113,8 @@ module face_display (
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0
     })
+
+    // Look right-down: cols 2,4 × rows 2,3
     const EYE_RIGHT_DOWN = $reverse({
         1b0,1b0,1b0,1b0,1b0,
         1b0,1b0,1b0,1b0,1b0,
@@ -111,301 +122,73 @@ module face_display (
         1b0,1b0,1b1,1b0,1b1,   // mrow3: boxes 17,19
         1b0,1b0,1b0,1b0,1b0
     })
-    // Wink: right eye full, left eye loses top row first (half), then gone
-    const EYE_WINK_HALF = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b1,1b0,   // mrow1: right top (box8), left top gone
-        1b0,1b1,1b0,1b1,1b0,   // mrow2: left bottom(11) + right bottom(13)
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const EYE_WINK_CLOSED = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b1,1b0,   // mrow1: right top only (box8)
-        1b0,1b0,1b0,1b1,1b0,   // mrow2: right bottom only (box13)
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0
-    })
-    // Blush cheeks: mrow3 col0 (box15) and col4 (box19)
-    const CHEEK_BLUSH = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b1,1b0,1b0,1b0,1b1,   // mrow3: boxes 15,19
-        1b0,1b0,1b0,1b0,1b0
-    })
-
-    // ── EXPLOSION PATTERNS ────────────────────────────────────────────────────
-    const EXPL1 = $reverse({  // centre dot (box12)
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b1,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const EXPL2 = $reverse({  // diamond (boxes 6,8,16,18)
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b1,1b0,1b1,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b1,1b0,1b1,1b0,
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const EXPL3 = $reverse({  // outer ring (col2 always off)
-        1b1,1b1,1b0,1b1,1b1,
-        1b1,1b0,1b0,1b0,1b1,
-        1b0,1b0,1b0,1b0,1b0,
-        1b1,1b0,1b0,1b0,1b1,
-        1b1,1b1,1b0,1b1,1b1
-    })
-
-    // ── FIRE PATTERNS (3 frames: wide / mid / narrow) ─────────────────────────
-    const FIRE0_Y = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b1,1b0,1b0,1b0,1b1,   // mrow1: boxes 5,9
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const FIRE0_O = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b1,1b1,1b0,1b1,1b1,   // mrow2: boxes 10,11,13,14
-        1b1,1b0,1b1,1b0,1b1,   // mrow3: boxes 15,17,19
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const FIRE0_R = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b1,1b0,1b1,1b0,   // mrow3: boxes 16,18
-        1b1,1b1,1b1,1b1,1b1    // mrow4: boxes 20-24
-    })
-    const FIRE1_Y = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b1,1b0,1b1,1b0,   // mrow1: boxes 6,8
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const FIRE1_O = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b1,1b0,1b1,1b0,   // mrow2: boxes 11,13
-        1b1,1b0,1b1,1b0,1b1,   // mrow3: boxes 15,17,19
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const FIRE1_R = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b1,1b0,1b1,1b0,   // mrow3: boxes 16,18
-        1b1,1b1,1b1,1b1,1b1    // mrow4: boxes 20-24
-    })
-    const FIRE2_Y = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b1,1b0,1b0,   // mrow1: box 7
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const FIRE2_O = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b1,1b0,1b1,1b0,1b1,   // mrow2: boxes 10,12,14
-        1b1,1b0,1b1,1b0,1b1,   // mrow3: boxes 15,17,19
-        1b0,1b0,1b0,1b0,1b0
-    })
-    const FIRE2_R = $reverse({
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b0,1b0,1b0,1b0,
-        1b0,1b1,1b0,1b1,1b0,   // mrow3: boxes 16,18
-        1b1,1b1,1b1,1b1,1b1    // mrow4: boxes 20-24
-    })
-
-    // ── Colors ────────────────────────────────────────────────────────────────
-    const WHITE  = 24hFFFFFF
-    const RED    = 24h00FF00
-    const YELLOW = 24h00FF05
-    const ORANGE = 24h00FF02
 
     // ── Hardware ──────────────────────────────────────────────────────────────
     .clk(clk) {
         .rst(rst) {
-            dff state[5](#INIT(0))              // S_CENTER = 0
-            dff hold_ctr[10](#INIT(10d400))
-            dff lfsr[16](#INIT(16hACE1))
-            dff heat[5](#INIT(0))               // emotion tier counter
-            dff heat_ctr[10](#INIT(0))          // counts frame_done ticks; wraps → heat++
-            dff fire_frame[2](#INIT(0))         // 0,1,2 fire sub-frames
-            dff expl_ctr[8](#INIT(0))           // explosion / fire frame timer
+            dff state[4](#INIT(0))              // S_CENTER = 0 on reset
+            dff hold_ctr[10](#INIT(10d400))     // hold ~1.1 s before first transition
+            dff lfsr[16](#INIT(16hACE1))        // 16-bit Fibonacci LFSR
         }
     }
 
     sig box_index[5]
     sig is_eye
-    sig is_cheek
-    sig cur_tier[3]
-    sig fire_y
-    sig fire_o
-    sig fire_r
 
     always {
         // DFF hold defaults
-        state.d      = state.q
-        hold_ctr.d   = hold_ctr.q
-        lfsr.d       = lfsr.q
-        heat.d       = heat.q
-        heat_ctr.d   = heat_ctr.q
-        fire_frame.d = fire_frame.q
-        expl_ctr.d   = expl_ctr.q
+        state.d    = state.q
+        hold_ctr.d = hold_ctr.q
+        lfsr.d     = lfsr.q
 
         // Signal defaults
         color     = 24h000000
         box_index = 5d0
         is_eye    = 1b0
-        is_cheek  = 1b0
-        cur_tier  = 3d0
-        fire_y    = 1b0
-        fire_o    = 1b0
-        fire_r    = 1b0
 
-        // ── trigger: reset face to initial state ─────────────────────────────
-        if (trigger) {
-            state.d      = S_CENTER
-            hold_ctr.d   = 10d400
-            heat.d       = 5d0
-            heat_ctr.d   = 10d0
-            expl_ctr.d   = 8h0
-            fire_frame.d = 2d0
-        }
-
-        // ── Compute current emotion tier from heat ────────────────────────────
-        if (heat.q >= 5d18) {
-            cur_tier = 3d3      // explosion / fire
-        } else if (heat.q >= 5d16) {
-            cur_tier = 3d2      // red eyes
-        } else if (heat.q >= 5d1) {
-            cur_tier = 3d1      // blush
-        } else {
-            cur_tier = 3d0      // normal
-        }
-
-        // ── Per-frame logic ───────────────────────────────────────────────────
+        // ── Advance animation state on each completed frame ───────────────────
         if (frame_done) {
+            // Advance LFSR every tick
             lfsr.d = c{lfsr.q[14:0], lfsr.q[15]^lfsr.q[13]^lfsr.q[12]^lfsr.q[10]}
 
-            // Auto-increment heat every 1024 frames (~2.8 s) up to 25
-            heat_ctr.d = heat_ctr.q + 1
-            if (&heat_ctr.q[9:0]) {  // wraps every 1024 ticks
-                if (heat.q < 5d25) {
-                    heat.d = heat.q + 5d1
-                }
-            }
-
-            // Advance red-eye pulse counter every frame
-            if (state.q == S_RED) {
-                expl_ctr.d = expl_ctr.q + 1
-            }
-
-            // Explosion frames
-            if ((state.q == S_EXPL1) | (state.q == S_EXPL2) | (state.q == S_EXPL3)) {
-                expl_ctr.d = expl_ctr.q + 1
-                if (&expl_ctr.q) {
-                    expl_ctr.d = 8h0
-                    if (state.q == S_EXPL1) {
-                        state.d = S_EXPL2
-                    } else if (state.q == S_EXPL2) {
-                        state.d = S_EXPL3
-                    } else {
-                        state.d      = S_FIRE
-                        fire_frame.d = 2d0
-                    }
-                }
-            } else if (state.q == S_FIRE) {
-                expl_ctr.d = expl_ctr.q + 1
-                if (expl_ctr.q[6:0] == 7h7f) {
-                    expl_ctr.d = 8h0
-                    if (fire_frame.q == 2d2) {
-                        fire_frame.d = 2d0
-                    } else {
-                        fire_frame.d = fire_frame.q + 1
-                    }
-                }
-            } else if (hold_ctr.q != 10d0) {
+            if (hold_ctr.q != 10d0) {
                 hold_ctr.d = hold_ctr.q - 1
             } else {
-                // Hold expired: pick next state
+                // Hold expired: decide next state
                 if (state.q == S_BLINK1) {
                     state.d    = S_BLINK2
                     hold_ctr.d = 10d25
+
                 } else if (state.q == S_BLINK2) {
                     state.d    = S_BLINK3
                     hold_ctr.d = 10d30
+
                 } else if (state.q == S_BLINK3) {
                     state.d    = S_CENTER
                     hold_ctr.d = c{2b01, lfsr.q[7:0]}
-                } else if (state.q == S_BLUSH_W1) {
-                    state.d    = S_BLUSH_W2
-                    hold_ctr.d = 10d25
-                } else if (state.q == S_BLUSH_W2) {
-                    state.d    = S_BLUSH_W3
-                    hold_ctr.d = 10d30
-                } else if (state.q == S_BLUSH_W3) {
-                    state.d    = S_BLUSH
-                    hold_ctr.d = c{2b01, lfsr.q[7:0]}
-                } else if (state.q == S_BLUSH) {
-                    if (lfsr.q[1:0] == 2b00) {
-                        state.d    = S_BLUSH_W1
-                        hold_ctr.d = 10d30
-                    } else {
-                        hold_ctr.d = c{2b01, lfsr.q[7:0]}
-                    }
-                } else if (state.q == S_RED) {
-                    hold_ctr.d = c{2b01, lfsr.q[7:0]}
+
                 } else {
-                    // Normal: S_CENTER or look states
+                    // S_CENTER or any look state
                     if (lfsr.q[1:0] == 2b00) {
+                        // 25% chance: blink sequence
                         state.d    = S_BLINK1
                         hold_ctr.d = 10d30
                     } else if (lfsr.q[1:0] == 2b01) {
+                        // 25% chance: look somewhere
                         if      (lfsr.q[4:2] == 3b000) state.d = S_RIGHT
                         else if (lfsr.q[4:2] == 3b001) state.d = S_LEFT
                         else if (lfsr.q[4:2] == 3b010) state.d = S_UP
                         else if (lfsr.q[4:2] == 3b011) state.d = S_RIGHT_UP
                         else if (lfsr.q[4:2] == 3b100) state.d = S_LEFT_UP
                         else                            state.d = S_RIGHT_DOWN
+                        // Hold 512-1023 ticks (~1.4-2.8 s)
                         hold_ctr.d = c{1b1, lfsr.q[8:0]}
                     } else {
+                        // 50% chance: stay centre
                         state.d    = S_CENTER
                         hold_ctr.d = c{2b01, lfsr.q[7:0]}
                     }
                 }
-            }
-
-            // ── Tier-upgrade overrides (last-write-wins) ──────────────────────
-            // Normal → Blush
-            if ((cur_tier >= 3d1) &
-                ((state.q == S_CENTER)     | (state.q == S_RIGHT)       |
-                 (state.q == S_LEFT)       | (state.q == S_UP)           |
-                 (state.q == S_RIGHT_UP)   | (state.q == S_LEFT_UP)      |
-                 (state.q == S_RIGHT_DOWN) | (state.q == S_BLINK1)       |
-                 (state.q == S_BLINK2)     | (state.q == S_BLINK3))) {
-                state.d    = S_BLUSH
-                hold_ctr.d = c{2b01, lfsr.q[7:0]}
-            }
-            // Blush → Red
-            if ((cur_tier >= 3d2) &
-                ((state.q == S_BLUSH)   | (state.q == S_BLUSH_W1) |
-                 (state.q == S_BLUSH_W2) | (state.q == S_BLUSH_W3))) {
-                state.d    = S_RED
-                hold_ctr.d = c{2b01, lfsr.q[7:0]}
-                expl_ctr.d = 8h0
-            }
-            // Red → Explosion
-            if ((cur_tier >= 3d3) & (state.q == S_RED)) {
-                state.d    = S_EXPL1
-                expl_ctr.d = 8h0
             }
         }
 
@@ -413,90 +196,28 @@ module face_display (
         box_index = BOX_LOOKUP[$resize(pixel_address, $clog2($width(BOX_LOOKUP, 0)))]
 
         if (box_index < 25) {  // matrix only; top row stays black
-
-            if (state.q == S_FIRE) {
-                if (fire_frame.q == 2d0) {
-                    fire_y = FIRE0_Y[$resize(box_index, $clog2($width(FIRE0_Y, 0)))]
-                    fire_o = FIRE0_O[$resize(box_index, $clog2($width(FIRE0_O, 0)))]
-                    fire_r = FIRE0_R[$resize(box_index, $clog2($width(FIRE0_R, 0)))]
-                } else if (fire_frame.q == 2d1) {
-                    fire_y = FIRE1_Y[$resize(box_index, $clog2($width(FIRE1_Y, 0)))]
-                    fire_o = FIRE1_O[$resize(box_index, $clog2($width(FIRE1_O, 0)))]
-                    fire_r = FIRE1_R[$resize(box_index, $clog2($width(FIRE1_R, 0)))]
-                } else {
-                    fire_y = FIRE2_Y[$resize(box_index, $clog2($width(FIRE2_Y, 0)))]
-                    fire_o = FIRE2_O[$resize(box_index, $clog2($width(FIRE2_O, 0)))]
-                    fire_r = FIRE2_R[$resize(box_index, $clog2($width(FIRE2_R, 0)))]
-                }
-                if (fire_y) {
-                    color = YELLOW
-                } else if (fire_o) {
-                    color = ORANGE
-                } else if (fire_r) {
-                    color = RED
-                }
-
-            } else if ((state.q == S_EXPL1) | (state.q == S_EXPL2) | (state.q == S_EXPL3)) {
-                if (state.q == S_EXPL1) {
-                    is_eye = EXPL1[$resize(box_index, $clog2($width(EXPL1, 0)))]
-                } else if (state.q == S_EXPL2) {
-                    is_eye = EXPL2[$resize(box_index, $clog2($width(EXPL2, 0)))]
-                } else {
-                    is_eye = EXPL3[$resize(box_index, $clog2($width(EXPL3, 0)))]
-                }
-                if (is_eye) { color = RED }
-
-            } else if (state.q == S_RED) {
+            if (state.q == S_CENTER) {
                 is_eye = EYE_CENTER[$resize(box_index, $clog2($width(EYE_CENTER, 0)))]
-                if (is_eye) {
-                    // Triangle-wave pulsation: expl_ctr[7:6] → dim/med/bright/med
-                    if (expl_ctr.q[7:6] == 2b10) {
-                        color = 24h00FF00   // bright red
-                    } else if ((expl_ctr.q[7:6] == 2b01) | (expl_ctr.q[7:6] == 2b11)) {
-                        color = 24h006000   // medium red
-                    } else {
-                        color = 24h001000   // dim red
-                    }
-                }
+            } else if ((state.q == S_BLINK1) | (state.q == S_BLINK3)) {
+                is_eye = EYE_BLINK_HALF[$resize(box_index, $clog2($width(EYE_BLINK_HALF, 0)))]
+            } else if (state.q == S_BLINK2) {
+                is_eye = 1b0  // fully closed: no eye pixels
+            } else if (state.q == S_RIGHT) {
+                is_eye = EYE_RIGHT[$resize(box_index, $clog2($width(EYE_RIGHT, 0)))]
+            } else if (state.q == S_LEFT) {
+                is_eye = EYE_LEFT[$resize(box_index, $clog2($width(EYE_LEFT, 0)))]
+            } else if (state.q == S_UP) {
+                is_eye = EYE_UP[$resize(box_index, $clog2($width(EYE_UP, 0)))]
+            } else if (state.q == S_RIGHT_UP) {
+                is_eye = EYE_RIGHT_UP[$resize(box_index, $clog2($width(EYE_RIGHT_UP, 0)))]
+            } else if (state.q == S_LEFT_UP) {
+                is_eye = EYE_LEFT_UP[$resize(box_index, $clog2($width(EYE_LEFT_UP, 0)))]
+            } else if (state.q == S_RIGHT_DOWN) {
+                is_eye = EYE_RIGHT_DOWN[$resize(box_index, $clog2($width(EYE_RIGHT_DOWN, 0)))]
+            }
 
-            } else if ((state.q == S_BLUSH)    | (state.q == S_BLUSH_W1) |
-                       (state.q == S_BLUSH_W2)  | (state.q == S_BLUSH_W3)) {
-                if ((state.q == S_BLUSH_W1) | (state.q == S_BLUSH_W3)) {
-                    is_eye = EYE_WINK_HALF[$resize(box_index, $clog2($width(EYE_WINK_HALF, 0)))]
-                } else if (state.q == S_BLUSH_W2) {
-                    is_eye = EYE_WINK_CLOSED[$resize(box_index, $clog2($width(EYE_WINK_CLOSED, 0)))]
-                } else {
-                    is_eye = EYE_CENTER[$resize(box_index, $clog2($width(EYE_CENTER, 0)))]
-                }
-                is_cheek = CHEEK_BLUSH[$resize(box_index, $clog2($width(CHEEK_BLUSH, 0)))]
-                if (is_eye) {
-                    color = WHITE
-                } else if (is_cheek) {
-                    color = RED
-                }
-
-            } else {
-                // Normal tier: S_CENTER, blink, look states
-                if (state.q == S_CENTER) {
-                    is_eye = EYE_CENTER[$resize(box_index, $clog2($width(EYE_CENTER, 0)))]
-                } else if ((state.q == S_BLINK1) | (state.q == S_BLINK3)) {
-                    is_eye = EYE_BLINK_HALF[$resize(box_index, $clog2($width(EYE_BLINK_HALF, 0)))]
-                } else if (state.q == S_BLINK2) {
-                    is_eye = 1b0
-                } else if (state.q == S_RIGHT) {
-                    is_eye = EYE_RIGHT[$resize(box_index, $clog2($width(EYE_RIGHT, 0)))]
-                } else if (state.q == S_LEFT) {
-                    is_eye = EYE_LEFT[$resize(box_index, $clog2($width(EYE_LEFT, 0)))]
-                } else if (state.q == S_UP) {
-                    is_eye = EYE_UP[$resize(box_index, $clog2($width(EYE_UP, 0)))]
-                } else if (state.q == S_RIGHT_UP) {
-                    is_eye = EYE_RIGHT_UP[$resize(box_index, $clog2($width(EYE_RIGHT_UP, 0)))]
-                } else if (state.q == S_LEFT_UP) {
-                    is_eye = EYE_LEFT_UP[$resize(box_index, $clog2($width(EYE_LEFT_UP, 0)))]
-                } else if (state.q == S_RIGHT_DOWN) {
-                    is_eye = EYE_RIGHT_DOWN[$resize(box_index, $clog2($width(EYE_RIGHT_DOWN, 0)))]
-                }
-                if (is_eye) { color = WHITE }
+            if (is_eye) {
+                color = 24hFFFFFF  // WHITE
             }
         }
         // box_index >= 25 (top row): stays black
