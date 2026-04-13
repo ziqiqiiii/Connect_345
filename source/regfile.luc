@@ -1,0 +1,117 @@
+module regfile (
+    input clk,
+    input rst,
+    input we,           // write enable
+    input wa[4],        // write address (4-bit, 0-12)
+    input wd[32],       // write data
+    input ra1[4],       // read address port 1
+    input ra2[4],       // read address port 2
+    output rd1[32],     // read data port 1
+    output rd2[32],     // read data port 2
+
+    // 6 fixed combinational READ ports (always show output)
+    output p1_board_out[32],      // R0 - Player 1's Board
+    output p2_board_out[32],      // R1 - Player 2's Board
+    output curr_player_out[32],   // R2 - Current Player Turn
+    output curr_column_out[32],   // R3 - Current Column
+    output p1_score_out[32],      // R4 - Player 1's Score
+    output p2_score_out[32]       // R5 - Player 2's Score
+) {
+    .clk(clk) {
+        .rst(rst) {
+            dff p1_board[32](#INIT(0))       // 0x0
+            dff p2_board[32](#INIT(0))       // 0x1
+            dff curr_player[32](#INIT(0))    // 0x2
+            dff curr_column[32](#INIT(0))    // 0x3
+            dff p1_score[32](#INIT(0))       // 0x4
+            dff p2_score[32](#INIT(0))       // 0x5
+            dff main_board[32](#INIT(0))     // 0x6
+            dff temp[32](#INIT(0))           // 0x7
+            dff col0_height[32](#INIT(0))    // 0x8
+            dff col1_height[32](#INIT(0))    // 0x9
+            dff col2_height[32](#INIT(0))    // 0xA
+            dff col3_height[32](#INIT(0))    // 0xB
+            dff col4_height[32](#INIT(0))    // 0xC
+        }
+    }
+
+    always {
+        // ── Default: hold all values (prevents "signal not always driven" error) ──
+        p1_board.d    = p1_board.q
+        p2_board.d    = p2_board.q
+        curr_player.d = curr_player.q
+        curr_column.d = curr_column.q
+        p1_score.d    = p1_score.q
+        p2_score.d    = p2_score.q
+        main_board.d  = main_board.q
+        temp.d        = temp.q
+        col0_height.d = col0_height.q
+        col1_height.d = col1_height.q
+        col2_height.d = col2_height.q
+        col3_height.d = col3_height.q
+        col4_height.d = col4_height.q
+
+        // ── WRITE port (synchronous) ─────────────────────────────────────────────
+        if (we) {
+            case (wa) {
+                d0  : p1_board.d    = wd
+                d1  : p2_board.d    = wd
+                d2  : curr_player.d = wd
+                d3  : curr_column.d = wd
+                d4  : p1_score.d    = wd
+                d5  : p2_score.d    = wd
+                d6  : main_board.d  = wd
+                d7  : temp.d        = wd
+                d8  : col0_height.d = wd
+                d9  : col1_height.d = wd
+                d10 : col2_height.d = wd
+                d11 : col3_height.d = wd
+                d12 : col4_height.d = wd
+            }
+        }
+
+        // ── READ port 1 (combinational) ──────────────────────────────────────────
+        case (ra1) {
+            d0  : rd1 = p1_board.q
+            d1  : rd1 = p2_board.q
+            d2  : rd1 = curr_player.q
+            d3  : rd1 = curr_column.q
+            d4  : rd1 = p1_score.q
+            d5  : rd1 = p2_score.q
+            d6  : rd1 = main_board.q
+            d7  : rd1 = temp.q
+            d8  : rd1 = col0_height.q
+            d9  : rd1 = col1_height.q
+            d10 : rd1 = col2_height.q
+            d11 : rd1 = col3_height.q
+            d12 : rd1 = col4_height.q
+            default : rd1 = 0
+        }
+
+        // ── READ port 2 (combinational) ──────────────────────────────────────────
+        case (ra2) {
+            d0  : rd2 = p1_board.q
+            d1  : rd2 = p2_board.q
+            d2  : rd2 = curr_player.q
+            d3  : rd2 = curr_column.q
+            d4  : rd2 = p1_score.q
+            d5  : rd2 = p2_score.q
+            d6  : rd2 = main_board.q
+            d7  : rd2 = temp.q
+            d8  : rd2 = col0_height.q
+            d9  : rd2 = col1_height.q
+            d10 : rd2 = col2_height.q
+            d11 : rd2 = col3_height.q
+            d12 : rd2 = col4_height.q
+            default : rd2 = 0
+        }
+
+        // ── Fixed outputs (always show, wired to display) ────────────────────────
+        p1_board_out    = p1_board.q
+        p2_board_out    = p2_board.q
+        curr_player_out = curr_player.q
+        curr_column_out = curr_column.q
+        p1_score_out    = p1_score.q
+        p2_score_out    = p2_score.q
+    }
+}

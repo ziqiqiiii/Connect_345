@@ -71,3 +71,16 @@ Each testbench defines 8 directed test cases and validates outputs using `$asser
 
 - The top-level uses reduced divider values when `$is_sim()` is true to speed up simulation.
 - Multiplier output is the lower 32 bits of the product.
+
+## Generating FSM Diagram
+
+1. Make sure you have Mermaid CLI installed. If not, install it with:
+```
+npm install -g @mermaid-js/mermaid-cli
+```
+
+2. Build the diagram with:
+```
+mmdc -i fsm.mmd -o fsm.png -b white -s 3
+```
+> Note: `-s 3` represents "scale", and is required to increase the resolution of the image. Without it, text is unreadable.

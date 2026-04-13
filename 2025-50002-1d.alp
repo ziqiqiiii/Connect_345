@@ -202,6 +202,24 @@
                     "type": "DiskFile",
                     "path": "source/test_score.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/regfile.luc"
+                }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/datapath.luc"
+                }
+            },
+            {
+                "file": {
+                    "type": "DiskFile",
+                    "path": "source/fsm.luc"
+                }
             }
         ],
         "constraintFiles": [
