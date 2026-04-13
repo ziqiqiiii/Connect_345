@@ -11,10 +11,10 @@ module alchitry_top (
     input io_dip[3][8],
     output data,           // WS2812B data line C40
     // Physical header buttons (Bank C, active-low, PULLUP in ACF)
-    // p1_btn: [0]=C39 left  [1]=C42 right  [2]=C43 drop
-    // p2_btn: [0]=C45 left  [1]=C48 right
-    input p1_btn[3],
-    input p2_btn[2],
+    // [0]=C39 P1 left  [1]=C42 P1 right  [2]=C43 drop
+    // [3]=C45 P2 left  [4]=C48 P2 right
+    input game_btn[5],
+    input rst_btn,         // reset button — C21 (active-low, PULLUP)
     output tm_clk,         // TM1637 P1 clock — C23
     output tm_dio,         // TM1637 P1 data  — C24
     output tm2_clk,        // TM1637 P2 clock — C27
@@ -30,12 +30,12 @@ module alchitry_top (
     .clk(clk) {
         reset_conditioner reset_cond
 
-        // ── Button conditioners (active-low; invert before conditioning) ──────
-        button_conditioner btn0(#CLK_FREQ(CLK_FREQ), .in(~p1_btn[0]))  // P1 left  C39
-        button_conditioner btn1(#CLK_FREQ(CLK_FREQ), .in(~p1_btn[2]))  // drop     C43
-        button_conditioner btn2(#CLK_FREQ(CLK_FREQ), .in(~p1_btn[1]))  // P1 right C42
-        button_conditioner btn3(#CLK_FREQ(CLK_FREQ), .in(~p2_btn[0]))  // P2 left  C45
-        button_conditioner btn4(#CLK_FREQ(CLK_FREQ), .in(~p2_btn[1]))  // P2 right C48
+        // ── Button conditioners (game_btn is active-low; invert before conditioning) ──
+        button_conditioner btn0(#CLK_FREQ(CLK_FREQ), .in(~game_btn[0]))  // P1 left  C39
+        button_conditioner btn1(#CLK_FREQ(CLK_FREQ), .in(~game_btn[2]))  // drop     C43
+        button_conditioner btn2(#CLK_FREQ(CLK_FREQ), .in(~game_btn[1]))  // P1 right C42
+        button_conditioner btn3(#CLK_FREQ(CLK_FREQ), .in(~game_btn[3]))  // P2 left  C45
+        button_conditioner btn4(#CLK_FREQ(CLK_FREQ), .in(~game_btn[4]))  // P2 right C48
 
         // ── Edge detectors ────────────────────────────────────────
         edge_detector edge0(#RISE(1), #FALL(0), .in(btn0.out))
@@ -66,7 +66,7 @@ module alchitry_top (
     sig winner[2]  // 0=P1 won, 1=P2 won, 2=draw (derived from score registers)
 
     always {
-        reset_cond.in = ~rst_n
+        reset_cond.in = ~rst_n | ~rst_btn
         rst = reset_cond.out
 
         // ── Unused outputs ────────────────────────────────────────

@@ -1,10 +1,11 @@
 PINOUT(V1), STANDARD(LVCMOS33) {
     pin data C40
     PULL(UP) {
-        pin p1_btn[0] C39   // P1 left
-        pin p1_btn[1] C42   // P1 right
-        pin p1_btn[2] C43   // P1 drop
-        pin p2_btn[0] C45   // P2 left
-        pin p2_btn[1] C48   // P2 right
+        pin game_btn[0] C39   // P1 left
+        pin game_btn[1] C42   // P1 right
+        pin game_btn[2] C43   // drop
+        pin game_btn[3] C45   // P2 left
+        pin game_btn[4] C48   // P2 right
+        pin rst_btn     C21   // reset
     }
 }
