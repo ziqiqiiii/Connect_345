@@ -195,10 +195,10 @@ module fsm (
 
                 States.MOVE_LEFT_BRANCH:
                     ra2 = 4d7
-                    if (rd2 == 1) {
-                        state.d = States.MOVE_LEFT_WRAP
-                    } else {
+                    if (rd2 == 0) {
                         state.d = States.MOVE_LEFT_DEC
+                    } else {
+                        state.d = States.IDLE
                     }
 
                 States.MOVE_LEFT_DEC:
@@ -206,14 +206,6 @@ module fsm (
                     asel  = 2b00
                     bsel  = 3b010
                     alufn = SUB
-                    wa    = 4d3
-                    we    = 1
-                    state.d = States.IDLE
-
-                States.MOVE_LEFT_WRAP:
-                    asel  = 2b11
-                    bsel  = 3b001
-                    alufn = ADD
                     wa    = 4d3
                     we    = 1
                     state.d = States.IDLE
@@ -229,10 +221,10 @@ module fsm (
 
                 States.MOVE_RIGHT_BRANCH:
                     ra2 = 4d7
-                    if (rd2 == 1) {
-                        state.d = States.MOVE_RIGHT_WRAP
-                    } else {
+                    if (rd2 == 0) {
                         state.d = States.MOVE_RIGHT_INC
+                    } else {
+                        state.d = States.IDLE
                     }
 
                 States.MOVE_RIGHT_INC:
@@ -240,12 +232,6 @@ module fsm (
                     asel  = 2b00
                     bsel  = 3b010
                     alufn = ADD
-                    wa    = 4d3
-                    we    = 1
-                    state.d = States.IDLE
-
-                States.MOVE_RIGHT_WRAP:
-                    wdsel = 2b10
                     wa    = 4d3
                     we    = 1
                     state.d = States.IDLE
