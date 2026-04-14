@@ -13,7 +13,6 @@ module alu (
     compare compare
     boolean boolean(#SIZE(32))
     shifter shifter
-    multiplier multiplier
     score score
     popcount popcount
 
@@ -36,9 +35,6 @@ module alu (
         shifter.b = b[4:0]
         shifter.alufn = alufn
 
-        multiplier.a = a
-        multiplier.b = b
-
         score.a = a
 
         popcount.a = a
@@ -53,15 +49,12 @@ module alu (
             2b00:
                 // 000000 = ADD
                 // 000001 = SUB
-                // 000010 = MUL
                 // 000011 = SCORE
                 // 000100 = POPCOUNT
                 if (alufn[2]) {
                     out = popcount.count         // ALUFN=0001xx
                 } else if (alufn[1] & alufn[0]) {
                     out = score.result           // ALUFN=000011
-                } else if (alufn[1]) {
-                    out = multiplier.mul         // ALUFN=000010
                 } else {
                     out = adder.s                // ALUFN=00000x
                 }

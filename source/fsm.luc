@@ -34,7 +34,6 @@ module fsm (
     // ── ALUFN constants (verified from alu.luc) ───────────────────────────────
     const ADD          = 6b000000
     const SUB          = 6b000001
-    const MUL          = 6b000010
     const ALU_SCORE    = 6b000011
     const ALU_POPCOUNT = 6b000100
     const OR           = 6b011110
@@ -267,7 +266,7 @@ module fsm (
                 States.CALC_COL_OFFSET_0:
                     ra1   = 4d3
                     asel  = 2b00
-                    bsel  = 3b101
+                    bsel  = 3b100
                     alufn = SHL
                     wa    = 4d7
                     we    = 1
