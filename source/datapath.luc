@@ -80,6 +80,7 @@ module datapath (
             b010 : bsel_out = 32h1
             b011 : bsel_out = 32h5
             b100 : bsel_out = 32h6
+            b101 : bsel_out = 32h2
             default : bsel_out = rd2
         }
 

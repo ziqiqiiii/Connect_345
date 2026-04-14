@@ -50,14 +50,14 @@ module fsm (
         MOVE_LEFT_CHECK,
         MOVE_LEFT_BRANCH,
         MOVE_LEFT_DEC,
-        MOVE_LEFT_WRAP,
         MOVE_RIGHT_CHECK,
         MOVE_RIGHT_BRANCH,
         MOVE_RIGHT_INC,
-        MOVE_RIGHT_WRAP,
         VALIDATE_COL,
         VALIDATE_COL_BRANCH,
-        CALC_COL_OFFSET,
+        CALC_COL_OFFSET_0,
+        CALC_COL_OFFSET_1,
+        CALC_COL_OFFSET_2,
         CALC_ROW_OFFSET,
         COMPUTE_BITMASK,
         UPDATE_CURR_BOARD,
@@ -85,7 +85,7 @@ module fsm (
         .rst(rst) {
             dff state[$width(States)](#INIT(States.IDLE_FACE))
             dff init_counter[4](#INIT(0))
-            dff slow_ctr[20](#INIT(0))
+            dff slow_ctr[22](#INIT(0))
             dff latches[5](#INIT(0))  // [0]=p1l [1]=p1r [2]=p2l [3]=p2r [4]=drop
         }
     }
@@ -261,14 +261,34 @@ module fsm (
                     if (rd2 == 1) {
                         state.d = States.IDLE
                     } else {
-                        state.d = States.CALC_COL_OFFSET
+                        state.d = States.CALC_COL_OFFSET_0
                     }
 
-                States.CALC_COL_OFFSET:
+                States.CALC_COL_OFFSET_0:
                     ra1   = 4d3
                     asel  = 2b00
-                    bsel  = 3b100
-                    alufn = MUL
+                    bsel  = 3b101
+                    alufn = SHL
+                    wa    = 4d7
+                    we    = 1
+                    state.d = States.CALC_COL_OFFSET_1
+
+                States.CALC_COL_OFFSET_1:
+                    ra1   = 4d7
+                    ra2   = 4d3
+                    asel  = 2b00
+                    bsel  = 3b000
+                    alufn = ADD
+                    wa    = 4d7
+                    we    = 1
+                    state.d = States.CALC_COL_OFFSET_2
+
+                States.CALC_COL_OFFSET_2:
+                    ra1   = 4d7
+                    ra2   = 4d3
+                    asel  = 2b00
+                    bsel  = 3b000
+                    alufn = ADD
                     wa    = 4d7
                     we    = 1
                     state.d = States.CALC_ROW_OFFSET
