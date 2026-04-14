@@ -73,14 +73,13 @@ module datapath (
         // Input 1: 0x00 (constant 0)
         // Input 2: 0x01 (constant 1)
         // Input 3: 0x05 (constant 5 — board width/height)
-        // Input 4: 0x06 (constant 6 — bits per row in board encoding)
+        // Input 4: 0x02 (constant 2 — shift amount for col*4)
         case (bsel) {
             b000 : bsel_out = rd2
             b001 : bsel_out = 32h0
             b010 : bsel_out = 32h1
             b011 : bsel_out = 32h5
-            b100 : bsel_out = 32h6
-            b101 : bsel_out = 32h2
+            b100 : bsel_out = 32h2
             default : bsel_out = rd2
         }
 
