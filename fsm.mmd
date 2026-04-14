@@ -1,7 +1,18 @@
 %%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 80}}}%%
 flowchart TD
 
-  START(( )) --> INIT
+  START(( )) --> IDLE_FACE
+
+  IDLE_FACE["<b>IDLE_FACE</b>
+  ─────────────────
+  ra1: --
+  ra2: --
+  wa: --
+  we: b0
+  alufn: --
+  asel: --
+  bsel: --
+  wdsel: --"]
 
   INIT["<b>INIT</b>
   ─────────────────
@@ -12,7 +23,7 @@ flowchart TD
   alufn: --
   asel: --
   bsel: --
-  wdsel: 10
+  wdsel: b10
   init_counter: +1 until 12"]
 
   IDLE["<b>IDLE</b>
@@ -28,8 +39,19 @@ flowchart TD
 
   MOVE_LEFT_CHECK["<b>MOVE_LEFT_CHECK</b>
   ─────────────────
+  ra1: 0d3
+  ra2: --
+  wa: 0d7
+  we: b1
+  alufn: CMPEQ
+  asel: b00
+  bsel: b001
+  wdsel: --"]
+
+  MOVE_LEFT_BRANCH["<b>MOVE_LEFT_BRANCH</b>
+  ─────────────────
   ra1: --
-  ra2: 0d3
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -48,21 +70,21 @@ flowchart TD
   bsel: b010
   wdsel: --"]
 
-  MOVE_LEFT_WRAP["<b>MOVE_LEFT_WRAP</b>
-  ─────────────────
-  ra1: --
-  ra2: --
-  wa: 0d3
-  we: b1
-  alufn: ADD
-  asel: b11
-  bsel: b001
-  wdsel: b10"]
-
   MOVE_RIGHT_CHECK["<b>MOVE_RIGHT_CHECK</b>
   ─────────────────
   ra1: --
   ra2: 0d3
+  wa: 0d7
+  we: b1
+  alufn: CMPEQ
+  asel: b11
+  bsel: b000
+  wdsel: --"]
+
+  MOVE_RIGHT_BRANCH["<b>MOVE_RIGHT_BRANCH</b>
+  ─────────────────
+  ra1: --
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -81,21 +103,21 @@ flowchart TD
   bsel: b010
   wdsel: --"]
 
-  MOVE_RIGHT_WRAP["<b>MOVE_RIGHT_WRAP</b>
-  ─────────────────
-  ra1: --
-  ra2: --
-  wa: 0d3
-  we: b1
-  alufn: --
-  asel: --
-  bsel: --
-  wdsel: b10"]
-
   VALIDATE_COL["<b>VALIDATE_COL</b>
   ─────────────────
+  ra1: curr_col-dependent
+  ra2: --
+  wa: 0d7
+  we: b1
+  alufn: CMPEQ
+  asel: b00
+  bsel: b011
+  wdsel: --"]
+
+  VALIDATE_COL_BRANCH["<b>VALIDATE_COL_BRANCH</b>
+  ─────────────────
   ra1: --
-  ra2: curr_col-dependent
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -103,15 +125,37 @@ flowchart TD
   bsel: --
   wdsel: --"]
 
-  CALC_COL_OFFSET["<b>CALC_COL_OFFSET</b>
+  CALC_COL_OFFSET_0["<b>CALC_COL_OFFSET_0</b>
   ─────────────────
   ra1: 0d3
   ra2: --
   wa: 0d7
   we: b1
-  alufn: MUL
+  alufn: SHL
   asel: b00
-  bsel: b100
+  bsel: b101
+  wdsel: --"]
+
+  CALC_COL_OFFSET_1["<b>CALC_COL_OFFSET_1</b>
+  ─────────────────
+  ra1: 0d7
+  ra2: 0d3
+  wa: 0d7
+  we: b1
+  alufn: ADD
+  asel: b00
+  bsel: b000
+  wdsel: --"]
+
+  CALC_COL_OFFSET_2["<b>CALC_COL_OFFSET_2</b>
+  ─────────────────
+  ra1: 0d7
+  ra2: 0d3
+  wa: 0d7
+  we: b1
+  alufn: ADD
+  asel: b00
+  bsel: b000
   wdsel: --"]
 
   CALC_ROW_OFFSET["<b>CALC_ROW_OFFSET</b>
@@ -194,7 +238,7 @@ flowchart TD
   BRANCH_MOVE_COUNT["<b>BRANCH_MOVE_COUNT</b>
   ─────────────────
   ra1: --
-  ra2: 7
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -204,19 +248,52 @@ flowchart TD
 
   SWITCH_PLAYER["<b>SWITCH_PLAYER</b>
   ─────────────────
-  ra1: --
-  ra2: 0d2
+  ra1: 0d2
+  ra2: --
   wa: 0d2
   we: b1
-  alufn: SUB
-  asel: b01
-  bsel: b000
+  alufn: XOR
+  asel: b00
+  bsel: b010
   wdsel: --"]
 
   WIN_CHECK["<b>WIN_CHECK</b>
   ─────────────────
   ra1: 0d4
   ra2: 0d5
+  wa: 0d7
+  we: b1
+  alufn: CMPLT
+  asel: b00
+  bsel: b000
+  wdsel: --"]
+
+  WIN_BRANCH_LT["<b>WIN_BRANCH_LT</b>
+  ─────────────────
+  ra1: --
+  ra2: 0d7
+  wa: --
+  we: b0
+  alufn: --
+  asel: --
+  bsel: --
+  wdsel: --"]
+
+  WIN_CHECK_EQ["<b>WIN_CHECK_EQ</b>
+  ─────────────────
+  ra1: 0d4
+  ra2: 0d5
+  wa: 0d7
+  we: b1
+  alufn: CMPEQ
+  asel: b00
+  bsel: b000
+  wdsel: --"]
+
+  WIN_BRANCH_EQ["<b>WIN_BRANCH_EQ</b>
+  ─────────────────
+  ra1: --
+  ra2: 0d7
   wa: --
   we: b0
   alufn: --
@@ -284,11 +361,14 @@ flowchart TD
   ra1: --
   ra2: --
   wa: --
-  we: b1
+  we: b0
   alufn: --
   asel: --
   bsel: --
   wdsel: --"]
+
+  IDLE_FACE -->|btn_drop| INIT
+  IDLE_FACE -->|no btn_drop| IDLE_FACE
 
   INIT -->|init_counter == 12| IDLE
   INIT -->|init_counter != 12| INIT
@@ -299,20 +379,23 @@ flowchart TD
   IDLE -->|curr_player == 1 && btn_p2_right| MOVE_RIGHT_CHECK
   IDLE -->|btn_drop| VALIDATE_COL
 
-  MOVE_LEFT_CHECK -->|rd2 == 0| MOVE_LEFT_WRAP
-  MOVE_LEFT_CHECK -->|rd2 != 0| MOVE_LEFT_DEC
+  MOVE_LEFT_CHECK --> MOVE_LEFT_BRANCH
+  MOVE_LEFT_BRANCH -->|rd2 == 0| MOVE_LEFT_DEC
+  MOVE_LEFT_BRANCH -->|rd2 != 0| IDLE
   MOVE_LEFT_DEC --> IDLE
-  MOVE_LEFT_WRAP --> IDLE
 
-  MOVE_RIGHT_CHECK -->|rd2 == 4| MOVE_RIGHT_WRAP
-  MOVE_RIGHT_CHECK -->|rd2 != 4| MOVE_RIGHT_INC
+  MOVE_RIGHT_CHECK --> MOVE_RIGHT_BRANCH
+  MOVE_RIGHT_BRANCH -->|rd2 == 0| MOVE_RIGHT_INC
+  MOVE_RIGHT_BRANCH -->|rd2 != 0| IDLE
   MOVE_RIGHT_INC --> IDLE
-  MOVE_RIGHT_WRAP --> IDLE
 
-  VALIDATE_COL -->|rd2 == 5| IDLE
-  VALIDATE_COL -->|rd2 != 5| CALC_COL_OFFSET
+  VALIDATE_COL --> VALIDATE_COL_BRANCH
+  VALIDATE_COL_BRANCH -->|rd2 == 1| IDLE
+  VALIDATE_COL_BRANCH -->|rd2 != 1| CALC_COL_OFFSET_0
 
-  CALC_COL_OFFSET --> CALC_ROW_OFFSET
+  CALC_COL_OFFSET_0 --> CALC_COL_OFFSET_1
+  CALC_COL_OFFSET_1 --> CALC_COL_OFFSET_2
+  CALC_COL_OFFSET_2 --> CALC_ROW_OFFSET
   CALC_ROW_OFFSET --> COMPUTE_BITMASK
   COMPUTE_BITMASK --> UPDATE_CURR_BOARD
   UPDATE_CURR_BOARD --> UPDATE_MAIN_BOARD
@@ -325,17 +408,20 @@ flowchart TD
   BRANCH_MOVE_COUNT -->|rd2 != 25| SWITCH_PLAYER
   SWITCH_PLAYER --> IDLE
 
-  WIN_CHECK -->|rd1 > rd2| P1_WINS
-  WIN_CHECK -->|rd2 > rd1| P2_WINS
-  WIN_CHECK -->|rd1 == rd2| DRAW_0
+  WIN_CHECK --> WIN_BRANCH_LT
+  WIN_BRANCH_LT -->|rd2 == 1| P2_WINS
+  WIN_BRANCH_LT -->|rd2 != 1| WIN_CHECK_EQ
+  WIN_CHECK_EQ --> WIN_BRANCH_EQ
+  WIN_BRANCH_EQ -->|rd2 == 1| DRAW_0
+  WIN_BRANCH_EQ -->|rd2 != 1| P1_WINS
 
   P1_WINS --> GAME_OVER
   P2_WINS --> GAME_OVER
   DRAW_0 --> DRAW_1
   DRAW_1 --> GAME_OVER
 
-  GAME_OVER -->|any button| RESTART_WAIT
-  GAME_OVER -->|none| GAME_OVER
+  GAME_OVER -->|btn_drop| RESTART_WAIT
+  GAME_OVER -->|no btn_drop| GAME_OVER
 
-  RESTART_WAIT -->|all released| INIT
-  RESTART_WAIT -->|not all released| RESTART_WAIT
+  RESTART_WAIT -->|all latches clear| IDLE_FACE
+  RESTART_WAIT -->|latches not clear| RESTART_WAIT

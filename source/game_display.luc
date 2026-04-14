@@ -1,0 +1,88 @@
+module game_display (
+    input pixel_address[7],   // 0-89 from ws2812b_driver
+    input p1_board[32],       // R0 from regfile
+    input p2_board[32],       // R1 from regfile
+    input curr_col[32],       // R3 from regfile
+    input curr_player[32],    // R2 from regfile (0=P1, 1=P2)
+    output color[24]          // 24-bit BRG color to driver
+) {
+    const RED    = 24h00FF00
+    const YELLOW = 24h00FF05
+    const OFF    = 24h000000
+
+    // Maps each pixel_address (0-89) → cell index (0-29).
+    // Every 3 consecutive pixels share the same cell, so this eliminates
+    // the 3x duplication in the original case statement.
+    //   Cells 0-4  = cursor row  (pixels  0-14)
+    //   Cells 5-9  = board row 4 (pixels 15-29)
+    //   Cells 10-14 = board row 3 (pixels 30-44)
+    //   Cells 15-19 = board row 2 (pixels 45-59)
+    //   Cells 20-24 = board row 1 (pixels 60-74)
+    //   Cells 25-29 = board row 0 (pixels 75-89)
+    // Written high-to-low so $reverse gives pixel 0→cell 0, pixel 3→cell 1, etc.
+    const CELL = {
+        5d29,5d29,5d29, 5d28,5d28,5d28, 5d27,5d27,5d27,
+        5d26,5d26,5d26, 5d25,5d25,5d25, 5d24,5d24,5d24,
+        5d23,5d23,5d23, 5d22,5d22,5d22, 5d21,5d21,5d21,
+        5d20,5d20,5d20, 5d19,5d19,5d19, 5d18,5d18,5d18,
+        5d17,5d17,5d17, 5d16,5d16,5d16, 5d15,5d15,5d15,
+        5d14,5d14,5d14, 5d13,5d13,5d13, 5d12,5d12,5d12,
+        5d11,5d11,5d11, 5d10,5d10,5d10, 5d9, 5d9, 5d9,
+        5d8, 5d8, 5d8,  5d7, 5d7, 5d7,  5d6, 5d6, 5d6,
+        5d5, 5d5, 5d5,  5d4, 5d4, 5d4,  5d3, 5d3, 5d3,
+        5d2, 5d2, 5d2,  5d1, 5d1, 5d1,  5d0, 5d0, 5d0
+    }
+
+    sig cell[5]
+
+    always {
+        cell = CELL[pixel_address]
+
+        case (cell) {
+            // ── Cursor row (cells 0-4): player color on active column ────────
+            // P1=RED, P2=YELLOW — matches the board piece colors
+            0:  color = (curr_col == 0) ? (curr_player == 0 ? RED : YELLOW) : OFF
+            1:  color = (curr_col == 1) ? (curr_player == 0 ? RED : YELLOW) : OFF
+            2:  color = (curr_col == 2) ? (curr_player == 0 ? RED : YELLOW) : OFF
+            3:  color = (curr_col == 3) ? (curr_player == 0 ? RED : YELLOW) : OFF
+            4:  color = (curr_col == 4) ? (curr_player == 0 ? RED : YELLOW) : OFF
+
+            // ── Board row 4 TOP (cells 5-9): col0→bit4, col1→bit10, … ────────
+            5:  color = p1_board[28]  ? RED : (p2_board[28]  ? YELLOW : OFF)
+            6:  color = p1_board[22] ? RED : (p2_board[22] ? YELLOW : OFF)
+            7:  color = p1_board[16] ? RED : (p2_board[16] ? YELLOW : OFF)
+            8:  color = p1_board[10] ? RED : (p2_board[10] ? YELLOW : OFF)
+            9:  color = p1_board[4] ? RED : (p2_board[4] ? YELLOW : OFF)
+
+            // ── Board row 3 (cells 10-14): col0→bit3, col1→bit9, … ──────────
+            10: color = p1_board[3]  ? RED : (p2_board[3]  ? YELLOW : OFF)
+            11: color = p1_board[9]  ? RED : (p2_board[9]  ? YELLOW : OFF)
+            12: color = p1_board[15] ? RED : (p2_board[15] ? YELLOW : OFF)
+            13: color = p1_board[21] ? RED : (p2_board[21] ? YELLOW : OFF)
+            14: color = p1_board[27] ? RED : (p2_board[27] ? YELLOW : OFF)
+
+            // ── Board row 2 (cells 15-19): col0→bit2, col1→bit8, … ──────────
+            15: color = p1_board[26]  ? RED : (p2_board[26]  ? YELLOW : OFF)
+            16: color = p1_board[20]  ? RED : (p2_board[20]  ? YELLOW : OFF)
+            17: color = p1_board[14] ? RED : (p2_board[14] ? YELLOW : OFF)
+            18: color = p1_board[8] ? RED : (p2_board[8] ? YELLOW : OFF)
+            19: color = p1_board[2] ? RED : (p2_board[2] ? YELLOW : OFF)
+
+            // ── Board row 1 (cells 20-24): col0→bit1, col1→bit7, … ──────────
+            20: color = p1_board[1]  ? RED : (p2_board[1]  ? YELLOW : OFF)
+            21: color = p1_board[7]  ? RED : (p2_board[7]  ? YELLOW : OFF)
+            22: color = p1_board[13] ? RED : (p2_board[13] ? YELLOW : OFF)
+            23: color = p1_board[19] ? RED : (p2_board[19] ? YELLOW : OFF)
+            24: color = p1_board[25] ? RED : (p2_board[25] ? YELLOW : OFF)
+
+            // ── Board row 0 BOTTOM (cells 25-29): col0→bit0, col1→bit6, … ───
+            25: color = p1_board[24]  ? RED : (p2_board[24]  ? YELLOW : OFF)
+            26: color = p1_board[18]  ? RED : (p2_board[18]  ? YELLOW : OFF)
+            27: color = p1_board[12] ? RED : (p2_board[12] ? YELLOW : OFF)
+            28: color = p1_board[6] ? RED : (p2_board[6] ? YELLOW : OFF)
+            29: color = p1_board[0] ? RED : (p2_board[0] ? YELLOW : OFF)
+
+            default: color = OFF
+        }
+    }
+}

@@ -1,0 +1,38 @@
+// Cycles through preset values to test the 7-segment display.
+//
+// io_button[0] (btn_next) → step forward
+// io_button[1] (btn_prev) → step back
+//
+// Preset sequence (wraps): 0000 → 1111 → 1234 → 5678 → 8765 → 9999
+module seg_test (
+    input clk,
+    input rst,
+    input btn_next,    // single-cycle pulse: advance to next preset
+    input btn_prev,    // single-cycle pulse: go to previous preset
+    output value[16]   // currently selected value (binary, passed to bin_to_dec)
+) {
+    .clk(clk), .rst(rst) {
+        dff sel[3]   // 0–5: which preset is active
+    }
+
+    always {
+        // Advance / go back on button pulse
+        if (btn_next) {
+            sel.d = (sel.q == 5) ? 3b0 : sel.q + 1
+        }
+        if (btn_prev) {
+            sel.d = (sel.q == 0) ? 3d5 : sel.q - 1
+        }
+
+        // Output the currently selected preset value
+        case (sel.q) {
+            0:       value = 16d0
+            1:       value = 16d1111
+            2:       value = 16d1234
+            3:       value = 16d5678
+            4:       value = 16d8765
+            5:       value = 16d9999
+            default: value = 16d0
+        }
+    }
+}

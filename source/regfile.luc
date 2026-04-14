@@ -9,6 +9,10 @@ module regfile (
     output rd1[32],     // read data port 1
     output rd2[32],     // read data port 2
 
+    // Debug read port — driven by io_dip on the FPGA
+    input dbg_ra[4],    // debug read address
+    output dbg_rd[32],  // debug read data
+
     // 6 fixed combinational READ ports (always show output)
     output p1_board_out[32],      // R0 - Player 1's Board
     output p2_board_out[32],      // R1 - Player 2's Board
@@ -104,6 +108,25 @@ module regfile (
             d11 : rd2 = col3_height.q
             d12 : rd2 = col4_height.q
             default : rd2 = 0
+        }
+
+        // ── DEBUG READ port (combinational, driven by io_dip) ────────────────────
+        // io_dip[0][3:0] selects which register to inspect (R0–R12)
+        case (dbg_ra) {
+            d0  : dbg_rd = p1_board.q
+            d1  : dbg_rd = p2_board.q
+            d2  : dbg_rd = curr_player.q
+            d3  : dbg_rd = curr_column.q
+            d4  : dbg_rd = p1_score.q
+            d5  : dbg_rd = p2_score.q
+            d6  : dbg_rd = main_board.q
+            d7  : dbg_rd = temp.q
+            d8  : dbg_rd = col0_height.q
+            d9  : dbg_rd = col1_height.q
+            d10 : dbg_rd = col2_height.q
+            d11 : dbg_rd = col3_height.q
+            d12 : dbg_rd = col4_height.q
+            default : dbg_rd = 0
         }
 
         // ── Fixed outputs (always show, wired to display) ────────────────────────

@@ -1,49 +1,189 @@
 module alchitry_top (
-    input clk,              // 100MHz clock
-    input rst_n,            // reset button (active low)
-    output led[8],          // 8 user controllable LEDs
-    input usb_rx,            // USB->Serial input
-    output usb_tx,           // USB->Serial output
-    output io_led[3][8],     // LEDs on IO Shield
-    output io_segment[8],        // 7-segment LEDs on IO Shield
-    output io_select[4],        // Digit select on IO Shield
-    input io_button[5],      // 5 buttons on IO Shield
-    input io_dip[3][8]       // DIP switches on IO Shield
+    input clk,
+    input rst_n,
+    output led[8],
+    input usb_rx,
+    output usb_tx,
+    output io_led[3][8],
+    output io_segment[8],
+    output io_select[4],
+    input io_button[5],    // io_shield buttons (kept for constraint; not used for game)
+    input io_dip[3][8],
+    output data,           // WS2812B data line C40
+    // Physical header buttons (Bank C, active-low, PULLUP in ACF)
+    // [0]=C39 P1 left  [1]=C42 P1 right  [2]=C43 drop
+    // [3]=C45 P2 left  [4]=C48 P2 right
+    input game_btn[5],
+    input rst_btn,         // reset button — C21 (active-low, PULLUP)
+    output tm_clk,         // TM1637 P1 clock — C23
+    output tm_dio,         // TM1637 P1 data  — C24
+    output tm2_clk,        // TM1637 P2 clock — C27
+    output tm2_dio         // TM1637 P2 data  — C28
 ) {
-    
-    sig rst                 // reset signal
-    
-    .clk(clk) {
-        // The reset conditioner is used to synchronize the reset signal to the FPGA
-        // clock. This ensures the entire FPGA comes out of reset at the same time.
-        reset_conditioner reset_cond
-    }
-    const CLK_FREQ = $is_sim() ? 1000 : 100000000 // put 1000 for sim, 100000000 otherwise in hardware
-    
-    tester_manual_alu alu_manual(.clk(clk), .rst(rst), .io_button(io_button), .io_dip(io_dip), #CLK_FREQ(CLK_FREQ))
-    automated_alu_tester alu_tester(.clk(clk), .rst(rst))
-   
-    
-    always {
-        reset_cond.in = ~rst_n  // input raw inverted reset signal
-        rst = reset_cond.out    // conditioned reset
-        
-        led = 8h00             // turn LEDs off
-        
-        usb_tx = usb_rx          // loop serial port
-        
+    const CLK_FREQ = $is_sim() ? 1000 : 100000000
+    const PIXEL_COUNT = 90
+    const SEVEN_SEG_DIV = $is_sim() ? 3 : 16
+    const TM_HALF_PERIOD = $is_sim() ? 2 : 1000  // 50 kHz TM1637 clock @ 100 MHz
 
-        // to test ALU 
-        io_segment = alu_manual.io_segment
-        io_select = alu_manual.io_select         
-        io_led = alu_manual.io_led
-        
-        alu_tester.start_button = io_button[2]
-        alu_tester.start_io_dip = io_dip[2][7]
-        led[1:0] = alu_tester.state_debug[1:0]
-        io_led[2][3] = alu_tester.running
-        led[7] = alu_tester.last_index
-        led[6:2] = alu_tester.index
-        alu_tester.force_error = io_dip[2][6]
+    sig rst
+
+    .clk(clk) {
+        reset_conditioner reset_cond
+
+        // ── Button conditioners (game_btn is active-low; invert before conditioning) ──
+        button_conditioner btn0(#CLK_FREQ(CLK_FREQ), .in(~game_btn[0]))  // P1 left  C39
+        button_conditioner btn1(#CLK_FREQ(CLK_FREQ), .in(~game_btn[2]))  // drop     C43
+        button_conditioner btn2(#CLK_FREQ(CLK_FREQ), .in(~game_btn[1]))  // P1 right C42
+        button_conditioner btn3(#CLK_FREQ(CLK_FREQ), .in(~game_btn[3]))  // P2 left  C45
+        button_conditioner btn4(#CLK_FREQ(CLK_FREQ), .in(~game_btn[4]))  // P2 right C48
+
+        // ── Edge detectors ────────────────────────────────────────
+        edge_detector edge0(#RISE(1), #FALL(0), .in(btn0.out))
+        edge_detector edge1(#RISE(1), #FALL(0), .in(btn1.out))
+        edge_detector edge2(#RISE(1), #FALL(0), .in(btn2.out))
+        edge_detector edge3(#RISE(1), #FALL(0), .in(btn3.out))
+        edge_detector edge4(#RISE(1), #FALL(0), .in(btn4.out))
+
+        .rst(rst) {
+            // ── Core modules ──────────────────────────────────────
+            datapath dp
+            fsm game_fsm
+            ws2812b_driver driver(#PIXEL_COUNT(PIXEL_COUNT))
+            win_display wd
+            face_display fd
+            dff game_over_prev(#INIT(0))  // for rising-edge trigger on win_display
+
+            // ── Score display modules ─────────────────────────────
+            multi_seven_seg seg(#DIV(SEVEN_SEG_DIV))   // IO Shield 7-seg (P2 score)
+            tm1637_driver tm1637(#HALF_PERIOD(TM_HALF_PERIOD))   // P1: C23/C24
+            tm1637_driver tm1637_p2(#HALF_PERIOD(TM_HALF_PERIOD)) // P2: C27/C28
+        }
+    }
+    game_display display
+    bin_to_dec btd(#DIGITS(4))    // P1 score → BCD
+    bin_to_dec btd2(#DIGITS(4))   // P2 score → BCD
+
+    sig winner[2]  // 0=P1 won, 1=P2 won, 2=draw (derived from score registers)
+
+    always {
+        reset_cond.in = ~rst_n | ~rst_btn
+        rst = reset_cond.out
+
+        // ── Unused outputs ────────────────────────────────────────
+        usb_tx     = usb_rx
+        led        = 8h00
+        io_segment = 8hff
+        io_select  = 4hf
+
+        // ── Derive winner from score registers (set by FSM win states) ────
+        // R4 = 0xF when P1 wins, R5 = 0xF when P2 wins, both 0xFFFF on draw
+        winner = dp.p1_score_out == 32hF ? 2b00 :
+                 dp.p2_score_out == 32hF ? 2b01 :
+                 2b10
+
+        // ── Debug read port ───────────────────────────────────────
+        // io_dip[0][3:0]  = register address (R0–R12)
+        // io_dip[1][0]    = page: 0 → bits[15:0], 1 → bits[31:16]
+        dp.dbg_ra = io_dip[0][3:0]
+
+        // io_led[0]: FSM state (5-bit, LEDs 4:0)  — unchanged
+        io_led[0] = game_fsm.fsm_state
+
+        // io_led[2:1]: 16-bit window into selected register
+        //   page=0 → io_led[2]=bits[15:8], io_led[1]=bits[7:0]
+        //   page=1 → io_led[2]=bits[31:24], io_led[1]=bits[23:16]
+        if (io_dip[1][0]) {
+            io_led[1] = dp.dbg_rd[23:16]
+            io_led[2] = dp.dbg_rd[31:24]
+        } else {
+            io_led[1] = dp.dbg_rd[7:0]
+            io_led[2] = dp.dbg_rd[15:8]
+        }
+
+        // ── Wire FSM → Datapath ───────────────────────────────────
+        dp.ra1   = game_fsm.ra1
+        dp.ra2   = game_fsm.ra2
+        dp.wa    = game_fsm.wa
+        dp.we    = game_fsm.we
+        dp.alufn = game_fsm.alufn
+        dp.asel  = game_fsm.asel
+        dp.bsel  = game_fsm.bsel
+        dp.wdsel = game_fsm.wdsel
+
+        // ── Wire Datapath → FSM ───────────────────────────────────
+        game_fsm.rd1         = dp.rd1_out
+        game_fsm.rd2         = dp.rd2_out
+        game_fsm.curr_player = dp.curr_player_out
+        game_fsm.curr_col    = dp.curr_column_out
+
+        // ── Wire Buttons → FSM ────────────────────────────────────
+        game_fsm.btn_p1_left  = edge0.out
+        game_fsm.btn_drop     = edge1.out
+        game_fsm.btn_p1_right = edge2.out
+        game_fsm.btn_p2_left  = edge3.out
+        game_fsm.btn_p2_right = edge4.out
+
+        // ── Wire Datapath → game_display ─────────────────────────
+        display.pixel_address = driver.pixel_address
+        display.p1_board      = dp.p1_board_out
+        display.p2_board      = dp.p2_board_out
+        display.curr_col      = dp.curr_column_out
+        display.curr_player   = dp.curr_player_out
+
+        // ── Win display trigger (rising edge of game_over) ───────────────
+        game_over_prev.d = game_fsm.game_over
+
+        // ── Wire win_display ──────────────────────────────────────────────
+        wd.pixel_address = driver.pixel_address
+        wd.winner        = winner
+        wd.trigger       = game_fsm.game_over & !game_over_prev.q
+        wd.frame_done    = driver.done
+
+        // ── Wire face_display ─────────────────────────────────────────────
+        fd.pixel_address = driver.pixel_address
+        fd.frame_done    = driver.done
+        // Gate button heat presses to idle_face state only.
+        // Bit order: [3]=P2 right [2]=P2 left [1]=P1 right [0]=P1 left
+        fd.heat_btn = c{game_fsm.idle_face & edge4.out,
+                        game_fsm.idle_face & edge3.out,
+                        game_fsm.idle_face & edge2.out,
+                        game_fsm.idle_face & edge0.out}
+
+        // ── Wire Display → Driver (priority: game_over > idle_face > game) ─
+        if (game_fsm.game_over) {
+            driver.color = wd.color
+        } else if (game_fsm.idle_face) {
+            driver.color = fd.color
+        } else {
+            driver.color = display.color
+        }
+        driver.update = 1
+        driver.clear  = 0
+        data          = driver.data
+
+        // ── Score display ─────────────────────────────────────────
+        btd.value  = dp.p1_score_out[15:0]   // P1 score → BCD
+        btd2.value = dp.p2_score_out[15:0]   // P2 score → BCD
+
+        // P1 TM1637 (C23/C24): digits[0]=leftmost, reverse bin_to_dec order
+        tm1637.digits[0] = btd.digits[3]   // thousands
+        tm1637.digits[1] = btd.digits[2]
+        tm1637.digits[2] = btd.digits[1]
+        tm1637.digits[3] = btd.digits[0]   // ones
+        tm_clk = tm1637.tm_clk
+        tm_dio = tm1637.tm_dio
+
+        // P2 TM1637 (C27/C28)
+        tm1637_p2.digits[0] = btd2.digits[3]
+        tm1637_p2.digits[1] = btd2.digits[2]
+        tm1637_p2.digits[2] = btd2.digits[1]
+        tm1637_p2.digits[3] = btd2.digits[0]
+        tm2_clk = tm1637_p2.tm_clk
+        tm2_dio = tm1637_p2.tm_dio
+
+        // IO Shield 7-segment: P2 score
+        seg.values = btd2.digits
+        io_segment = ~seg.seg
+        io_select  = ~seg.sel
     }
 }
