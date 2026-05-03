@@ -1,5 +1,7 @@
 # 2026 50.002 1D Project
 
+![CompStruct 1D Poster](CompStruct%201D%20Poster_Final_HiRes.png)
+
 Lucid V2 implementation of a 32-bit ALU datapath and supporting components, built in Alchitry Lab V2.
 
 ## Project Overview
